@@ -6,8 +6,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 set(SOURCES ${SOURCES})
 
 # include_directories(lava_engine "src")
-# file(GLOB_RECURSE sources "{CMAKE_CURRENT_SOURCE_DIR}/**/*.cpp")
-add_library(lava_engine "src/header.cpp" "src/app.cpp" "src/core/window.cpp")
+file(GLOB_RECURSE LAVA_SOURCES CONFIGURE_DEPENDS "**/*.cpp")
+add_library(lava_engine ${LAVA_SOURCES})
+# add_library(lava_engine "src/header.cpp" "src/app.cpp" "src/core/window.cpp")
 include(FetchContent)
 
 # ---
