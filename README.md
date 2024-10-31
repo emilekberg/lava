@@ -25,3 +25,5 @@ cd build/playground/pong/Release/
 ## references
 
 https://vulkan-tutorial.com/
+
+https://github.com/KhronosGroup/Vulkan-Hpp/blob/main/vk_raii_ProgrammingGuide.md

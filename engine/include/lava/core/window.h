@@ -1,5 +1,9 @@
 #pragma once
-#include <glfw/glfw3.h>
+#define VK_USE_PLATFORM_WIN31_KHR
+#include <GLFW/glfw3.h>
+#define GLFW_EXPOSE_NATIVE_WIN31
+#include <GLFW/glfw3native.h>
+
 namespace lava::core
 {
     class Window
@@ -13,8 +17,10 @@ namespace lava::core
         void pollEvents();
         void activate();
 
+        HWND getWindowHandle();
+        GLFWwindow* getGLFWwindow();
 
     private:
-        GLFWwindow* _windowHandle;
+        GLFWwindow* _glfwWindow;
     };
 }
