@@ -34,9 +34,9 @@ namespace lava
         void createCommandPool();
         void createCommandBuffer();
         void createSyncObjects();
-        void recordCommandBuffer(const vk::raii::CommandBuffer& commandBuffer, uint32_t imageIndex);
+        void recordCommandBuffer(const vk::raii::CommandBuffer &commandBuffer, uint32_t imageIndex);
 
-        vk::raii::ShaderModule createShaderModule(const std::vector<char>& code);
+        vk::raii::ShaderModule createShaderModule(const std::vector<char> &code);
 
         vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats);
         vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes);
@@ -46,15 +46,16 @@ namespace lava
         bool isDeviceSuitable(const vk::raii::PhysicalDevice &physicalDevice);
         bool checkValidationLayerSupport(const std::vector<const char *> &requiredValidationLayers);
         std::vector<const char *> getRequiredExtensions();
-
-        std::unique_ptr<core::Window> _window;
-        std::unique_ptr<vk::raii::Instance> _vulkanInstance;
-
         static VKAPI_ATTR vk::Bool32 VKAPI_CALL vkdebugCallback(
             vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
             vk::DebugUtilsMessageTypeFlagsEXT messageType,
             const vk::DebugUtilsMessengerCallbackDataEXT *pCallbackData,
             void *pUserData);
+
+        const size_t MAX_FRAMES_IN_FLIGHT = 2;
+
+        std::unique_ptr<core::Window> _window;
+        std::unique_ptr<vk::raii::Instance> _vulkanInstance;
 
         static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
             VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -81,7 +82,7 @@ namespace lava
         std::vector<vk::raii::ImageView> _swapchainImageViews;
 
         std::unique_ptr<vk::raii::RenderPass> _renderpass;
-        std::unique_ptr<vk::raii::PipelineLayout> _pipelineLayout; 
+        std::unique_ptr<vk::raii::PipelineLayout> _pipelineLayout;
         std::unique_ptr<vk::raii::Pipeline> _pipeline;
 
         std::vector<vk::raii::Framebuffer> _swapchainFrameBuffers;
@@ -92,7 +93,6 @@ namespace lava
         std::unique_ptr<vk::raii::Semaphore> _imageAvailableSemaphore;
         std::unique_ptr<vk::raii::Semaphore> _renderFinishedSemaphore;
         std::unique_ptr<vk::raii::Fence> _inFlightFence;
-
     };
 
 }

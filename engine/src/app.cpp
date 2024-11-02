@@ -26,6 +26,7 @@ namespace lava
             update();
             render();
         }
+        _device->waitIdle();
         cleanup();
     }
 
@@ -128,13 +129,9 @@ namespace lava
 
     void App::cleanup()
     {
-        vk::Result waitResult = _device->waitForFences({*_inFlightFence.get()}, vk::True, UINT64_MAX);
-        _device->resetFences({*_inFlightFence.get()});
         _inFlightFence = nullptr;
-    
-        // _commandBuffer = nullptr;
+        _commandBuffers->clear();
         _commandPool = nullptr;
-        _swapchainFrameBuffers.clear();
         _pipeline = nullptr;
         _pipelineLayout = nullptr;
         _renderpass = nullptr;
