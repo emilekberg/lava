@@ -18,6 +18,7 @@ namespace lava
 
     private:
         void init();
+        void cleanupSwapChain();
         void cleanup();
         void initWindow();
         void initVulkan();
@@ -27,6 +28,7 @@ namespace lava
         void pickPhysicalDevice();
         void createLogicalDevice();
         void createSwapChain();
+        void recreateSwapChain();
         void createImageViews();
         void createRenderPass();
         void createGraphicsPipeline();
@@ -90,9 +92,10 @@ namespace lava
         std::unique_ptr<vk::raii::CommandPool> _commandPool;
         std::unique_ptr<vk::raii::CommandBuffers> _commandBuffers;
 
-        std::unique_ptr<vk::raii::Semaphore> _imageAvailableSemaphore;
-        std::unique_ptr<vk::raii::Semaphore> _renderFinishedSemaphore;
-        std::unique_ptr<vk::raii::Fence> _inFlightFence;
+        std::vector<vk::raii::Semaphore> _imageAvailableSemaphore;
+        std::vector<vk::raii::Semaphore> _renderFinishedSemaphore;
+        std::vector<vk::raii::Fence> _inFlightFence;
+        uint32_t _currentFrame = 0;
     };
 
 }

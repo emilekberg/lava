@@ -6,7 +6,7 @@ namespace lava::core
           glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
           glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
           glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-          _glfwWindow = glfwCreateWindow(640, 480, "Lava", NULL, NULL);
+          _glfwWindow = glfwCreateWindow(800, 600, "Lava", NULL, NULL);
           if (!_glfwWindow)
           {
                glfwTerminate();

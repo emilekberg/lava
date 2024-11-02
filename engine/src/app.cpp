@@ -36,37 +36,55 @@ namespace lava
 
     void App::render()
     {
-        vk::Result waitResult = _device->waitForFences({*_inFlightFence.get()}, vk::True, UINT64_MAX);
-        _device->resetFences({*_inFlightFence.get()});
+        vk::Result result = _device->waitForFences({*_inFlightFence[_currentFrame]}, vk::True, UINT64_MAX);
+        _device->resetFences({*_inFlightFence[_currentFrame]});
 
-        vk::Result result;
         uint32_t imageIndex;
-        std::tie(result, imageIndex) = _swapchain->acquireNextImage(UINT64_MAX, *_imageAvailableSemaphore.get());
-        _commandBuffers->at(0).reset();
 
-        recordCommandBuffer(_commandBuffers->at(0), imageIndex);
+#ifndef VULKAN_HPP_NO_EXCEPTIONS
+        try
+#endif
+        {
+            std::tie(result, imageIndex) = _swapchain->acquireNextImage(UINT64_MAX, *_imageAvailableSemaphore[_currentFrame]);
+            if (result == vk::Result::eErrorOutOfDateKHR)
+            {
+                recreateSwapChain();
+                return;
+            }
+            else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
+            {
+                throw std::runtime_error("failed to acquire swap chain image!");
+            }
+        }
+#ifndef VULKAN_HPP_NO_EXCEPTIONS
+        catch (vk::OutOfDateKHRError &e)
+        {
+            recreateSwapChain();
+            return;
+        }
+#endif
+        _commandBuffers->at(_currentFrame).reset();
 
+        recordCommandBuffer(_commandBuffers->at(_currentFrame), imageIndex);
 
         vk::SubmitInfo submitInfo = {};
 
-        vk::Semaphore waitSemaphore[] = {*_imageAvailableSemaphore.get()};
+        vk::Semaphore waitSemaphore[] = {*_imageAvailableSemaphore[_currentFrame]};
         vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
         submitInfo.setWaitSemaphoreCount(1);
         submitInfo.setPWaitSemaphores(waitSemaphore);
         submitInfo.setPWaitDstStageMask(waitStages);
 
-        vk::CommandBuffer commandBuffers[] = {_commandBuffers->at(0)};
+        vk::CommandBuffer commandBuffers[] = {_commandBuffers->at(_currentFrame)};
         submitInfo.setCommandBufferCount(1);
         submitInfo.setCommandBuffers(commandBuffers);
 
-        vk::Semaphore signalSemaphores[] = {*_renderFinishedSemaphore.get()};
+        vk::Semaphore signalSemaphores[] = {*_renderFinishedSemaphore[_currentFrame]};
         submitInfo.setSignalSemaphoreCount(1);
         submitInfo.setPSignalSemaphores(signalSemaphores);
 
+        _graphicsQueue->submit({submitInfo}, *_inFlightFence[_currentFrame]);
 
-
-        _graphicsQueue->submit({submitInfo}, *_inFlightFence.get());
-        
         vk::PresentInfoKHR presentInfo{};
         presentInfo.setWaitSemaphoreCount(1);
         presentInfo.setPWaitSemaphores(signalSemaphores);
@@ -76,8 +94,29 @@ namespace lava
         presentInfo.setPSwapchains(swapChains);
         presentInfo.setPImageIndices(&imageIndex);
 
-        vk::Result presentResult = _presentQueue->presentKHR(presentInfo);
+#ifndef VULKAN_HPP_NO_EXCEPTIONS
+        try
+#endif
+        {
 
+            result = _presentQueue->presentKHR(presentInfo);
+            if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)
+            {
+                recreateSwapChain();
+                return;
+            }
+            else if (result != vk::Result::eSuccess)
+            {
+                throw std::runtime_error("failed to present swap chain image!");
+            }
+        }
+#ifndef VULKAN_HPP_NO_EXCEPTIONS
+        catch (const vk::OutOfDateKHRError &e)
+        {
+            recreateSwapChain();
+        }
+#endif
+        _currentFrame = (_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
     void App::recordCommandBuffer(const vk::raii::CommandBuffer &commandBuffer, uint32_t imageIndex)
     {
@@ -119,7 +158,6 @@ namespace lava
 
         commandBuffer.endRenderPass();
         commandBuffer.end();
-
     }
     void App::init()
     {
@@ -127,21 +165,27 @@ namespace lava
         initVulkan();
     }
 
+    void App::cleanupSwapChain()
+    {
+        _swapchainFrameBuffers.clear();
+        _swapchainImageViews.clear();
+        _swapchain = nullptr;
+    }
+
     void App::cleanup()
     {
-        _inFlightFence = nullptr;
+        cleanupSwapChain();
+        _inFlightFence.clear();
         _commandBuffers->clear();
         _commandPool = nullptr;
         _pipeline = nullptr;
         _pipelineLayout = nullptr;
         _renderpass = nullptr;
 
-        _renderFinishedSemaphore = nullptr;
-        _imageAvailableSemaphore = nullptr;
+        _renderFinishedSemaphore.clear();
+        _imageAvailableSemaphore.clear();
 
-        _swapchainFrameBuffers.clear();
         _swapchainImages.clear();
-        _swapchainImageViews.clear();
         _swapchain = nullptr;
         _presentQueue = nullptr;
         _graphicsQueue = nullptr;
@@ -445,6 +489,16 @@ namespace lava
         _swapchainExtent = extent;
     }
 
+    void App::recreateSwapChain()
+    {
+        _device->waitIdle();
+        cleanupSwapChain();
+
+        createSwapChain();
+        createImageViews();
+        createFrameBuffers();
+    }
+
     void App::createImageViews()
     {
         // _swapchainImageViews.resize(_swapchainImages.size());
@@ -514,10 +568,9 @@ namespace lava
         dependency.setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
         // dependency.setSrcAccessMask();
         dependency.setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-        dependency.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite );
+        dependency.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
         renderPassInfo.setDependencyCount(1);
         renderPassInfo.setPDependencies(&dependency);
-
 
         _renderpass = std::make_unique<vk::raii::RenderPass>(*_device.get(), renderPassInfo);
     }
@@ -677,7 +730,7 @@ namespace lava
         vk::CommandBufferAllocateInfo allocInfo{};
         allocInfo.setCommandPool(*_commandPool.get());
         allocInfo.setLevel(vk::CommandBufferLevel::ePrimary);
-        allocInfo.setCommandBufferCount(1);
+        allocInfo.setCommandBufferCount(MAX_FRAMES_IN_FLIGHT);
 
         _commandBuffers = std::make_unique<vk::raii::CommandBuffers>(*_device.get(), allocInfo);
     }
@@ -688,12 +741,13 @@ namespace lava
         vk::FenceCreateInfo fenceInfo{};
         fenceInfo.setFlags(vk::FenceCreateFlagBits::eSignaled);
 
-        _imageAvailableSemaphore = std::make_unique<vk::raii::Semaphore>(*_device.get(), semaphoreInfo);
-        _renderFinishedSemaphore = std::make_unique<vk::raii::Semaphore>(*_device.get(), semaphoreInfo);
-        _inFlightFence = std::make_unique<vk::raii::Fence>(*_device.get(), fenceInfo);
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            _imageAvailableSemaphore.push_back(vk::raii::Semaphore(*_device.get(), semaphoreInfo));
+            _renderFinishedSemaphore.push_back(vk::raii::Semaphore(*_device.get(), semaphoreInfo));
+            _inFlightFence.push_back(vk::raii::Fence(*_device.get(), fenceInfo));
+        }
     }
-
-
 
     bool App::checkValidationLayerSupport(const std::vector<const char *> &requiredValidationLayers)
     {
