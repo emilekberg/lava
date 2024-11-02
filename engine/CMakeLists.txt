@@ -55,3 +55,6 @@ target_link_libraries(lava_engine
 target_compile_definitions(lava_engine PUBLIC GLFW_INCLUDE_VULKAN=${GLFW_INCLUDE_VULKAN})
 target_compile_definitions(lava_engine PUBLIC VK_USE_PLATFORM_WIN32_KHR=${VK_USE_PLATFORM_WIN32_KHR})
 target_compile_definitions(lava_engine PUBLIC GLFW_EXPOSE_NATIVE_WIN32=${GLFW_EXPOSE_NATIVE_WIN32})
+
+# file(COPY ./resources/basic_vert.spv DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+# file(COPY ./resources/basic_frag.spv DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

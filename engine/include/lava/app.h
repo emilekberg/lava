@@ -27,17 +27,34 @@ namespace lava
         void pickPhysicalDevice();
         void createLogicalDevice();
         void createSwapChain();
-        vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats);
-        vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes);
-        vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities);
+        void createImageViews();
+        void createRenderPass();
+        void createGraphicsPipeline();
+        void createFrameBuffers();
+        void createCommandPool();
+        void createCommandBuffer();
+        void createSyncObjects();
+        void recordCommandBuffer(const vk::raii::CommandBuffer& commandBuffer, uint32_t imageIndex);
 
-        bool checkDeviceExtensionsSupport(const vk::raii::PhysicalDevice& physicalDevice);
+        vk::raii::ShaderModule createShaderModule(const std::vector<char>& code);
+
+        vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats);
+        vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes);
+        vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities);
+
+        bool checkDeviceExtensionsSupport(const vk::raii::PhysicalDevice &physicalDevice);
         bool isDeviceSuitable(const vk::raii::PhysicalDevice &physicalDevice);
         bool checkValidationLayerSupport(const std::vector<const char *> &requiredValidationLayers);
         std::vector<const char *> getRequiredExtensions();
 
         std::unique_ptr<core::Window> _window;
         std::unique_ptr<vk::raii::Instance> _vulkanInstance;
+
+        static VKAPI_ATTR vk::Bool32 VKAPI_CALL vkdebugCallback(
+            vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+            vk::DebugUtilsMessageTypeFlagsEXT messageType,
+            const vk::DebugUtilsMessengerCallbackDataEXT *pCallbackData,
+            void *pUserData);
 
         static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
             VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -47,14 +64,35 @@ namespace lava
 
         std::unique_ptr<vk::raii::DebugUtilsMessengerEXT> _debugMessenger;
         bool _enableValidationLayers;
-        std::vector<const char*> _validationLayers;
-        std::vector<const char*> _deviceExtensions;
+        std::vector<const char *> _validationLayers;
+        std::vector<const char *> _deviceExtensions;
 
         std::unique_ptr<vk::raii::PhysicalDevice> _physicalDevice;
         std::unique_ptr<vk::raii::Device> _device;
         std::unique_ptr<vk::raii::SurfaceKHR> _surface;
         std::unique_ptr<vk::raii::Queue> _presentQueue;
+        std::unique_ptr<vk::raii::Queue> _graphicsQueue;
+
         std::unique_ptr<vk::raii::SwapchainKHR> _swapchain;
+        std::vector<vk::Image> _swapchainImages;
+        vk::Format _swapchainImageFormat;
+        vk::Extent2D _swapchainExtent;
+
+        std::vector<vk::raii::ImageView> _swapchainImageViews;
+
+        std::unique_ptr<vk::raii::RenderPass> _renderpass;
+        std::unique_ptr<vk::raii::PipelineLayout> _pipelineLayout; 
+        std::unique_ptr<vk::raii::Pipeline> _pipeline;
+
+        std::vector<vk::raii::Framebuffer> _swapchainFrameBuffers;
+
+        std::unique_ptr<vk::raii::CommandPool> _commandPool;
+        std::unique_ptr<vk::raii::CommandBuffers> _commandBuffers;
+
+        std::unique_ptr<vk::raii::Semaphore> _imageAvailableSemaphore;
+        std::unique_ptr<vk::raii::Semaphore> _renderFinishedSemaphore;
+        std::unique_ptr<vk::raii::Fence> _inFlightFence;
+
     };
-  
+
 }

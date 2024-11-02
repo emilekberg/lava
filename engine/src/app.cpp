@@ -2,6 +2,7 @@
 #include "lava/vulkan/queue-family.cpp"
 #include <set>
 #include "lava/vulkan/swapchain-support-details.h"
+#include "lava/resourceloader.h"
 #undef max
 namespace lava
 {
@@ -34,6 +35,90 @@ namespace lava
 
     void App::render()
     {
+        vk::Result waitResult = _device->waitForFences({*_inFlightFence.get()}, vk::True, UINT64_MAX);
+        _device->resetFences({*_inFlightFence.get()});
+
+        vk::Result result;
+        uint32_t imageIndex;
+        std::tie(result, imageIndex) = _swapchain->acquireNextImage(UINT64_MAX, *_imageAvailableSemaphore.get());
+        _commandBuffers->at(0).reset();
+
+        recordCommandBuffer(_commandBuffers->at(0), imageIndex);
+
+
+        vk::SubmitInfo submitInfo = {};
+
+        vk::Semaphore waitSemaphore[] = {*_imageAvailableSemaphore.get()};
+        vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
+        submitInfo.setWaitSemaphoreCount(1);
+        submitInfo.setPWaitSemaphores(waitSemaphore);
+        submitInfo.setPWaitDstStageMask(waitStages);
+
+        vk::CommandBuffer commandBuffers[] = {_commandBuffers->at(0)};
+        submitInfo.setCommandBufferCount(1);
+        submitInfo.setCommandBuffers(commandBuffers);
+
+        vk::Semaphore signalSemaphores[] = {*_renderFinishedSemaphore.get()};
+        submitInfo.setSignalSemaphoreCount(1);
+        submitInfo.setPSignalSemaphores(signalSemaphores);
+
+
+
+        _graphicsQueue->submit({submitInfo}, *_inFlightFence.get());
+        
+        vk::PresentInfoKHR presentInfo{};
+        presentInfo.setWaitSemaphoreCount(1);
+        presentInfo.setPWaitSemaphores(signalSemaphores);
+
+        vk::SwapchainKHR swapChains[] = {*_swapchain.get()};
+        presentInfo.setSwapchainCount(1);
+        presentInfo.setPSwapchains(swapChains);
+        presentInfo.setPImageIndices(&imageIndex);
+
+        vk::Result presentResult = _presentQueue->presentKHR(presentInfo);
+
+    }
+    void App::recordCommandBuffer(const vk::raii::CommandBuffer &commandBuffer, uint32_t imageIndex)
+    {
+        vk::CommandBufferBeginInfo beginInfo{};
+        // beginInfo.setFlags();
+        // beginInfo.setPInheritanceInfo(nullptr);
+
+        commandBuffer.begin(beginInfo);
+
+        vk::RenderPassBeginInfo renderPassBeginInfo{};
+        renderPassBeginInfo.setRenderPass(*_renderpass.get());
+        renderPassBeginInfo.setFramebuffer(_swapchainFrameBuffers[imageIndex]);
+        renderPassBeginInfo.setRenderArea({0, 0});
+        renderPassBeginInfo.renderArea.setExtent(_swapchainExtent);
+
+        vk::ClearValue clearColor = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        renderPassBeginInfo.setClearValueCount(1);
+        renderPassBeginInfo.setPClearValues(&clearColor);
+
+        commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+
+        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *_pipeline.get());
+
+        vk::Viewport viewport{};
+        viewport.setX(0.0f);
+        viewport.setY(0.0f);
+        viewport.setWidth(static_cast<float>(_swapchainExtent.width));
+        viewport.setHeight(static_cast<float>(_swapchainExtent.height));
+        viewport.setMinDepth(0.0f);
+        viewport.setMaxDepth(0.0f);
+        commandBuffer.setViewport(0, viewport);
+
+        vk::Rect2D scissor{};
+        scissor.setOffset({0, 0});
+        scissor.setExtent(_swapchainExtent);
+        commandBuffer.setScissor(0, scissor);
+
+        commandBuffer.draw(3, 1, 0, 0);
+
+        commandBuffer.endRenderPass();
+        commandBuffer.end();
+
     }
     void App::init()
     {
@@ -43,8 +128,26 @@ namespace lava
 
     void App::cleanup()
     {
+        vk::Result waitResult = _device->waitForFences({*_inFlightFence.get()}, vk::True, UINT64_MAX);
+        _device->resetFences({*_inFlightFence.get()});
+        _inFlightFence = nullptr;
+    
+        // _commandBuffer = nullptr;
+        _commandPool = nullptr;
+        _swapchainFrameBuffers.clear();
+        _pipeline = nullptr;
+        _pipelineLayout = nullptr;
+        _renderpass = nullptr;
+
+        _renderFinishedSemaphore = nullptr;
+        _imageAvailableSemaphore = nullptr;
+
+        _swapchainFrameBuffers.clear();
+        _swapchainImages.clear();
+        _swapchainImageViews.clear();
         _swapchain = nullptr;
         _presentQueue = nullptr;
+        _graphicsQueue = nullptr;
         _device = nullptr;
         _physicalDevice = nullptr;
         _window = nullptr;
@@ -68,17 +171,23 @@ namespace lava
 
         createLogicalDevice();
         createSwapChain();
+        createImageViews();
+        createRenderPass();
+        createGraphicsPipeline();
+        createFrameBuffers();
+        createCommandPool();
+        createCommandBuffer();
+        createSyncObjects();
     }
 
     void App::createDebugMessenger()
     {
         if (!_enableValidationLayers)
             return;
-        // vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
-        VkDebugUtilsMessengerCreateInfoEXT createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-        createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
+        createInfo.sType = vk::StructureType::eDebugUtilsMessengerCreateInfoEXT;
+        createInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
+        createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
         createInfo.pfnUserCallback = debugCallback;
         createInfo.pUserData = nullptr; // Optional
 
@@ -99,22 +208,20 @@ namespace lava
         vk::raii::Context context;
         uint32_t apiVersion = context.enumerateInstanceVersion();
 
-        VkApplicationInfo appInfo{};
-        appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+        vk::ApplicationInfo appInfo{};
         appInfo.pApplicationName = "Hello Triangle";
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "No Engine";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_0;
 
-        VkInstanceCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+        vk::InstanceCreateInfo createInfo{};
         createInfo.pApplicationInfo = &appInfo;
         uint32_t glfwExtensionCount = 0;
 
         auto requiredExtensions = getRequiredExtensions();
 
-        createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+        createInfo.flags |= vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
 
         createInfo.enabledExtensionCount = static_cast<uint32_t>(requiredExtensions.size());
         createInfo.ppEnabledExtensionNames = requiredExtensions.data();
@@ -134,11 +241,7 @@ namespace lava
         {
             throw std::runtime_error("failed to create vulkan instance");
         }
-
-        uint32_t extensionCount = 0;
-        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-        std::vector<VkExtensionProperties> extensions(extensionCount);
-        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+        std::vector<vk::ExtensionProperties> extensions = vk::enumerateInstanceExtensionProperties();
         fprintf(stdout, "available extensions:\n");
 
         for (const auto &extension : extensions)
@@ -149,18 +252,14 @@ namespace lava
 
     void App::createSurface()
     {
-        VkWin32SurfaceCreateInfoKHR createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+        vk::Win32SurfaceCreateInfoKHR createInfo{};
         createInfo.hwnd = _window->getWindowHandle();
         createInfo.hinstance = GetModuleHandle(nullptr);
-        _surface = std::make_unique<vk::raii::SurfaceKHR>(*_vulkanInstance.get(), createInfo, nullptr);
+        _surface = std::make_unique<vk::raii::SurfaceKHR>(*_vulkanInstance.get(), createInfo);
     }
 
     void App::pickPhysicalDevice()
     {
-        VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-        uint32_t deviceCount = 0;
-
         auto devices = vk::raii::PhysicalDevices(*_vulkanInstance.get());
         if (devices.size() == 0)
         {
@@ -184,9 +283,6 @@ namespace lava
 
         _physicalDevice = std::make_unique<vk::raii::PhysicalDevice>(std::move(selectedPhysicalDevice.value()));
         fprintf(stdout, "Selected device: %s\n", _physicalDevice->getProperties().deviceName);
-
-        // auto devices = vk::raii::PhysicalDevices(_vulkanInstance.get(), );
-        // vkEnumeratePhysicalDevices(_vulkanInstance.get(), &deviceCount, nullptr);
     }
 
     bool App::isDeviceSuitable(const vk::raii::PhysicalDevice &physicalDevice)
@@ -265,31 +361,27 @@ namespace lava
     {
         vulkan::QueueFamilyIndices indices = vulkan::findQueueFamilies(*_physicalDevice.get(), *_surface.get());
 
-        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+        std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
         std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
 
         float queuePriority = 1.0f;
         for (uint32_t queueFamily : uniqueQueueFamilies)
         {
-            VkDeviceQueueCreateInfo queueCreateInfo{};
-            queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            vk::DeviceQueueCreateInfo queueCreateInfo{};
             queueCreateInfo.queueFamilyIndex = queueFamily;
             queueCreateInfo.queueCount = 1;
             queueCreateInfo.pQueuePriorities = &queuePriority;
             queueCreateInfos.push_back(queueCreateInfo);
         }
 
-        VkPhysicalDeviceFeatures deviceFeatures{};
+        vk::PhysicalDeviceFeatures deviceFeatures{};
 
-        VkDeviceCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        vk::DeviceCreateInfo createInfo{};
         createInfo.pQueueCreateInfos = queueCreateInfos.data();
         createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
         createInfo.pEnabledFeatures = &deviceFeatures;
         createInfo.enabledExtensionCount = static_cast<uint32_t>(_deviceExtensions.size());
         createInfo.ppEnabledExtensionNames = _deviceExtensions.data();
-
-        createInfo.enabledExtensionCount = 0;
 
         if (_enableValidationLayers)
         {
@@ -303,6 +395,7 @@ namespace lava
 
         _device = std::make_unique<vk::raii::Device>(std::move(_physicalDevice->createDevice(createInfo)));
         _presentQueue = std::make_unique<vk::raii::Queue>(std::move(_device->getQueue(indices.presentFamily.value(), 0)));
+        _graphicsQueue = std::make_unique<vk::raii::Queue>(std::move(_device->getQueue(indices.graphicsFamily.value(), 0)));
     }
 
     void App::createSwapChain()
@@ -319,50 +412,295 @@ namespace lava
         }
 
         vk::SwapchainCreateInfoKHR createInfo{};
-        createInfo.sType = vk::StructureType::eSwapchainCreateInfoKHR;
-        createInfo.minImageCount = imageCount;
-        createInfo.imageFormat = surfaceFormat.format;
-        createInfo.imageColorSpace = surfaceFormat.colorSpace;
-        createInfo.imageExtent = extent;
-        createInfo.imageArrayLayers = 1;
-        createInfo.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
+        createInfo.setSurface(*_surface.get());
+        createInfo.setMinImageCount(imageCount);
+        createInfo.setImageFormat(surfaceFormat.format);
+        createInfo.setImageColorSpace(surfaceFormat.colorSpace);
+        createInfo.setImageExtent(extent);
+        createInfo.setImageArrayLayers(1);
+        createInfo.setImageUsage(vk::ImageUsageFlagBits::eColorAttachment);
 
         vulkan::QueueFamilyIndices indices = vulkan::findQueueFamilies(*_physicalDevice.get(), *_surface.get());
         uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
 
         if (indices.graphicsFamily != indices.presentFamily)
         {
-            createInfo.imageSharingMode = vk::SharingMode::eConcurrent;
-            createInfo.queueFamilyIndexCount = 2;
-            createInfo.pQueueFamilyIndices = queueFamilyIndices;
+            createInfo.setImageSharingMode(vk::SharingMode::eConcurrent);
+            createInfo.setQueueFamilyIndexCount(2);
+            createInfo.setPQueueFamilyIndices(queueFamilyIndices);
         }
         else
         {
-            createInfo.imageSharingMode = vk::SharingMode::eExclusive;
-            createInfo.queueFamilyIndexCount = 0;
-            createInfo.pQueueFamilyIndices = nullptr;
+            createInfo.setImageSharingMode(vk::SharingMode::eExclusive);
         }
 
-        createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
-        createInfo.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
-        createInfo.presentMode = presentMode;
-        createInfo.clipped = vk::True;
-        createInfo.oldSwapchain = VK_NULL_HANDLE;
+        createInfo.setPreTransform(swapChainSupport.capabilities.currentTransform);
+        createInfo.setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque);
+        createInfo.setPresentMode(presentMode);
+        createInfo.setClipped(vk::True);
 
-        // TODO: fix this
-
-        // createInfo.surface = *_surface.get()
+        // use this when recreating the swapchain from the old one.
+        // createInfo.setOldSwapchain(VK_NULL_HANDLE);
 
         _swapchain = std::make_unique<vk::raii::SwapchainKHR>(*_device.get(), createInfo, nullptr);
+        _swapchainImages = _swapchain->getImages();
+        _swapchainImageFormat = surfaceFormat.format;
+        _swapchainExtent = extent;
     }
+
+    void App::createImageViews()
+    {
+        // _swapchainImageViews.resize(_swapchainImages.size());
+        for (size_t i = 0; i < _swapchainImages.size(); i++)
+        {
+            vk::ImageViewCreateInfo createInfo{};
+            createInfo.setImage(_swapchainImages[i]);
+            createInfo.setViewType(vk::ImageViewType::e2D);
+            createInfo.setFormat(_swapchainImageFormat);
+            createInfo.components.setR(vk::ComponentSwizzle::eIdentity);
+            createInfo.components.setG(vk::ComponentSwizzle::eIdentity);
+            createInfo.components.setB(vk::ComponentSwizzle::eIdentity);
+            createInfo.components.setA(vk::ComponentSwizzle::eIdentity);
+
+            createInfo.subresourceRange.setAspectMask(vk::ImageAspectFlagBits::eColor);
+            createInfo.subresourceRange.setBaseMipLevel(0);
+            createInfo.subresourceRange.setLevelCount(1);
+            createInfo.subresourceRange.setBaseArrayLayer(0);
+            createInfo.subresourceRange.setLayerCount(1);
+
+            vk::raii::ImageView imageView(*_device.get(), createInfo);
+
+            _swapchainImageViews.push_back(std::move(imageView));
+        }
+    }
+
+    vk::raii::ShaderModule App::createShaderModule(const std::vector<char> &code)
+    {
+        vk::ShaderModuleCreateInfo createInfo{};
+        createInfo.setCodeSize(code.size());
+        createInfo.setPCode(reinterpret_cast<const uint32_t *>(code.data()));
+        return vk::raii::ShaderModule(*_device.get(), createInfo);
+    }
+
+    void App::createRenderPass()
+    {
+        vk::AttachmentDescription colorAttachment{};
+        colorAttachment.setFormat(_swapchainImageFormat);
+        colorAttachment.setSamples(vk::SampleCountFlagBits::e1);
+        colorAttachment.setLoadOp(vk::AttachmentLoadOp::eClear);
+        colorAttachment.setStoreOp(vk::AttachmentStoreOp::eStore);
+
+        colorAttachment.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare);
+        colorAttachment.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare);
+
+        colorAttachment.setInitialLayout(vk::ImageLayout::eUndefined);
+        colorAttachment.setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
+
+        vk::AttachmentReference colorAttachmentRef{};
+        colorAttachmentRef.setAttachment(0);
+        colorAttachmentRef.setLayout(vk::ImageLayout::eColorAttachmentOptimal);
+
+        vk::SubpassDescription subpass{};
+        subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics);
+        subpass.colorAttachmentCount = 1;
+        subpass.setPColorAttachments(&colorAttachmentRef);
+
+        vk::RenderPassCreateInfo renderPassInfo{};
+        renderPassInfo.setAttachmentCount(1);
+        renderPassInfo.setPAttachments(&colorAttachment);
+        renderPassInfo.setSubpassCount(1);
+        renderPassInfo.setPSubpasses(&subpass);
+
+        vk::SubpassDependency dependency{};
+        dependency.setSrcSubpass(vk::SubpassExternal);
+        dependency.setDstSubpass(0);
+        dependency.setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+        // dependency.setSrcAccessMask();
+        dependency.setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+        dependency.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite );
+        renderPassInfo.setDependencyCount(1);
+        renderPassInfo.setPDependencies(&dependency);
+
+
+        _renderpass = std::make_unique<vk::raii::RenderPass>(*_device.get(), renderPassInfo);
+    }
+
+    void App::createGraphicsPipeline()
+    {
+        auto vertShaderCode = lava::resourceloader::readfile("./build/shaders/basic_vert.spv");
+        auto fragShaderCode = lava::resourceloader::readfile("./build/shaders/basic_frag.spv");
+
+        vk::raii::ShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+        vk::raii::ShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+
+        vk::PipelineShaderStageCreateInfo vertShaderStageInfo{};
+        vertShaderStageInfo.setStage(vk::ShaderStageFlagBits::eVertex);
+        vertShaderStageInfo.setModule(vertShaderModule);
+        vertShaderStageInfo.setPName("main");
+
+        vk::PipelineShaderStageCreateInfo fragShaderStageInfo{};
+        fragShaderStageInfo.setStage(vk::ShaderStageFlagBits::eFragment);
+        fragShaderStageInfo.setModule(fragShaderModule);
+        fragShaderStageInfo.setPName("main");
+
+        vk::PipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
+        std::vector<vk::DynamicState> dynamicStates = {
+            vk::DynamicState::eViewport, vk::DynamicState::eScissor};
+
+        vk::PipelineDynamicStateCreateInfo dynamicState{};
+        dynamicState.setDynamicStateCount(static_cast<uint32_t>(dynamicStates.size()));
+        dynamicState.setPDynamicStates(dynamicStates.data());
+
+        vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
+        vertexInputInfo.setVertexBindingDescriptionCount(0);
+        vertexInputInfo.setPVertexBindingDescriptions(nullptr);
+        vertexInputInfo.setVertexAttributeDescriptionCount(0);
+        vertexInputInfo.setVertexAttributeDescriptions(nullptr);
+
+        vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
+        inputAssembly.setTopology(vk::PrimitiveTopology::eTriangleList);
+        inputAssembly.setPrimitiveRestartEnable(vk::False);
+
+        vk::Viewport viewport{};
+        viewport.setX(0.0f);
+        viewport.setY(0.0f);
+        viewport.setWidth((float)_swapchainExtent.width);
+        viewport.setHeight((float)_swapchainExtent.height);
+        viewport.setMinDepth(0.0f);
+        viewport.setMaxDepth(1.0f);
+
+        vk::Rect2D scissor{};
+        scissor.setOffset({0, 0});
+        scissor.setExtent(_swapchainExtent);
+
+        vk::PipelineViewportStateCreateInfo viewportState{};
+        viewportState.setViewportCount(1);
+        viewportState.setPViewports(&viewport);
+        viewportState.setScissorCount(1);
+        viewportState.setPScissors(&scissor);
+
+        vk::PipelineRasterizationStateCreateInfo rasterizer{};
+        rasterizer.setDepthClampEnable(vk::False);
+        rasterizer.setRasterizerDiscardEnable(vk::False);
+        rasterizer.setPolygonMode(vk::PolygonMode::eFill);
+        rasterizer.setLineWidth(1.0f);
+
+        rasterizer.setCullMode(vk::CullModeFlagBits::eBack);
+        rasterizer.setFrontFace(vk::FrontFace::eClockwise);
+
+        rasterizer.setDepthBiasEnable(vk::False);
+        rasterizer.setDepthBiasConstantFactor(0.0f);
+        rasterizer.setDepthBiasClamp(0.0f);
+        rasterizer.setDepthBiasSlopeFactor(0.0f);
+
+        vk::PipelineMultisampleStateCreateInfo multisampling{};
+        multisampling.setSampleShadingEnable(vk::False);
+        multisampling.setRasterizationSamples(vk::SampleCountFlagBits::e1);
+        multisampling.setMinSampleShading(1.0f);           // Optional
+        multisampling.setPSampleMask(nullptr);             // Optional
+        multisampling.setAlphaToCoverageEnable(vk::False); // Optional
+        multisampling.setAlphaToOneEnable(vk::False);      // Optional
+
+        vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
+        colorBlendAttachment.setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
+        colorBlendAttachment.setBlendEnable(vk::False);
+        colorBlendAttachment.setSrcColorBlendFactor(vk::BlendFactor::eOne);  // Optional
+        colorBlendAttachment.setDstColorBlendFactor(vk::BlendFactor::eZero); // Optional
+        colorBlendAttachment.setColorBlendOp(vk::BlendOp::eAdd);             // Optional
+        colorBlendAttachment.setDstAlphaBlendFactor(vk::BlendFactor::eOne);  // Optional
+        colorBlendAttachment.setDstAlphaBlendFactor(vk::BlendFactor::eZero); // Optional
+        colorBlendAttachment.setAlphaBlendOp(vk::BlendOp::eAdd);             // Optional
+
+        vk::PipelineColorBlendStateCreateInfo colorBlending{};
+        colorBlending.setLogicOpEnable(vk::False);
+        colorBlending.setAttachmentCount(1);
+        colorBlending.setPAttachments(&colorBlendAttachment);
+
+        vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
+        pipelineLayoutCreateInfo.setSetLayoutCount(0);
+        pipelineLayoutCreateInfo.setPSetLayouts(nullptr);
+
+        _pipelineLayout = std::make_unique<vk::raii::PipelineLayout>(*_device.get(), pipelineLayoutCreateInfo);
+
+        vk::GraphicsPipelineCreateInfo pipelineInfo{};
+        pipelineInfo.setStageCount(2);
+        pipelineInfo.setPStages(shaderStages);
+        pipelineInfo.setPVertexInputState(&vertexInputInfo);
+        pipelineInfo.setPInputAssemblyState(&inputAssembly);
+        pipelineInfo.setPViewportState(&viewportState);
+        pipelineInfo.setPRasterizationState(&rasterizer);
+        pipelineInfo.setPMultisampleState(&multisampling);
+        pipelineInfo.setPDepthStencilState(nullptr);
+        pipelineInfo.setPColorBlendState(&colorBlending);
+        pipelineInfo.setPDynamicState(&dynamicState);
+
+        pipelineInfo.setLayout(*_pipelineLayout.get());
+        pipelineInfo.setRenderPass(*_renderpass.get());
+
+        pipelineInfo.setSubpass(0);
+
+        _pipeline = std::make_unique<vk::raii::Pipeline>(*_device.get(), nullptr, pipelineInfo);
+    }
+
+    void App::createFrameBuffers()
+    {
+        // _swapchainFrameBuffers.resize(_swapchainImageViews.size());
+        for (auto const &imageview : _swapchainImageViews)
+        {
+            std::array<vk::ImageView, 1> attachments;
+            attachments[0] = imageview;
+
+            vk::FramebufferCreateInfo framebufferCreateInfo{};
+            framebufferCreateInfo.setRenderPass(*_renderpass.get());
+            framebufferCreateInfo.setAttachmentCount(1);
+            framebufferCreateInfo.setPAttachments(attachments.data());
+            framebufferCreateInfo.setWidth(_swapchainExtent.width);
+            framebufferCreateInfo.setHeight(_swapchainExtent.height);
+            framebufferCreateInfo.layers = 1;
+
+            auto fb = vk::raii::Framebuffer(*_device.get(), framebufferCreateInfo);
+            _swapchainFrameBuffers.push_back(std::move(fb));
+        }
+    }
+
+    void App::createCommandPool()
+    {
+        vulkan::QueueFamilyIndices queueFamilyIndices = vulkan::findQueueFamilies(*_physicalDevice.get(), *_surface.get());
+
+        vk::CommandPoolCreateInfo poolInfo{};
+        poolInfo.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
+        poolInfo.setQueueFamilyIndex(queueFamilyIndices.graphicsFamily.value());
+
+        _commandPool = std::make_unique<vk::raii::CommandPool>(*_device.get(), poolInfo);
+    }
+
+    void App::createCommandBuffer()
+    {
+        vk::CommandBufferAllocateInfo allocInfo{};
+        allocInfo.setCommandPool(*_commandPool.get());
+        allocInfo.setLevel(vk::CommandBufferLevel::ePrimary);
+        allocInfo.setCommandBufferCount(1);
+
+        _commandBuffers = std::make_unique<vk::raii::CommandBuffers>(*_device.get(), allocInfo);
+    }
+
+    void App::createSyncObjects()
+    {
+        vk::SemaphoreCreateInfo semaphoreInfo{};
+        vk::FenceCreateInfo fenceInfo{};
+        fenceInfo.setFlags(vk::FenceCreateFlagBits::eSignaled);
+
+        _imageAvailableSemaphore = std::make_unique<vk::raii::Semaphore>(*_device.get(), semaphoreInfo);
+        _renderFinishedSemaphore = std::make_unique<vk::raii::Semaphore>(*_device.get(), semaphoreInfo);
+        _inFlightFence = std::make_unique<vk::raii::Fence>(*_device.get(), fenceInfo);
+    }
+
+
 
     bool App::checkValidationLayerSupport(const std::vector<const char *> &requiredValidationLayers)
     {
-        uint32_t layerCount;
-        vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-        std::vector<VkLayerProperties> availableLayers(layerCount);
-        vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+        std::vector<vk::LayerProperties> availableLayers = vk::enumerateInstanceLayerProperties();
 
         fprintf(stdout, "using validation layers:\n");
         for (const char *layerName : requiredValidationLayers)
@@ -416,5 +754,20 @@ namespace lava
         fprintf(stderr, "validation layer: %s\n", pCallbackData->pMessage);
 
         return VK_FALSE;
+    }
+
+    VKAPI_ATTR vk::Bool32 VKAPI_CALL App::vkdebugCallback(
+        vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        vk::DebugUtilsMessageTypeFlagsEXT messageType,
+        const vk::DebugUtilsMessengerCallbackDataEXT *pCallbackData,
+        void *pUserData)
+    {
+        if (messageSeverity < vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning)
+        {
+            return vk::False;
+        }
+        fprintf(stderr, "validation layer: %s\n", pCallbackData->pMessage);
+
+        return vk::False;
     }
 }
