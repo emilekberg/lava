@@ -45,4 +45,13 @@ namespace lava::core
      {
           return _glfwWindow;
      }
+     template <typename T>
+     void Window::setOwner(T* owner)
+     {
+          glfwSetWindowUserPointer(_glfwWindow, owner);
+     }
+     void Window::setResizeHandler(void(callback)(GLFWwindow* window, int width, int height))
+     {
+          glfwSetFramebufferSizeCallback(_glfwWindow, callback);
+     }
 }

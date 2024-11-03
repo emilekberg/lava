@@ -12,9 +12,24 @@ namespace lava
             "VK_LAYER_KHRONOS_validation"};
         _deviceExtensions = {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+        _vertices = {
+            // top triangle
+            {{0.0f, -0.5f}, {1.0f, 1.0f, 1.0f}},
+            {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+            {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+
+            // bottom triangle
+            
+            {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+            {{0.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+            {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+
+
+            };
     }
     App::~App()
     {
+        cleanup();
     }
     void App::run()
     {
@@ -37,7 +52,6 @@ namespace lava
     void App::render()
     {
         vk::Result result = _device->waitForFences({*_inFlightFence[_currentFrame]}, vk::True, UINT64_MAX);
-        _device->resetFences({*_inFlightFence[_currentFrame]});
 
         uint32_t imageIndex;
 
@@ -48,8 +62,7 @@ namespace lava
             std::tie(result, imageIndex) = _swapchain->acquireNextImage(UINT64_MAX, *_imageAvailableSemaphore[_currentFrame]);
             if (result == vk::Result::eErrorOutOfDateKHR)
             {
-                recreateSwapChain();
-                return;
+                _framebufferResized = true;
             }
             else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
             {
@@ -59,10 +72,17 @@ namespace lava
 #ifndef VULKAN_HPP_NO_EXCEPTIONS
         catch (vk::OutOfDateKHRError &e)
         {
+            _framebufferResized = true;
+        }
+#endif
+        if (_framebufferResized)
+        {
+            _framebufferResized = false;
             recreateSwapChain();
             return;
         }
-#endif
+        _device->resetFences({*_inFlightFence[_currentFrame]});
+
         _commandBuffers->at(_currentFrame).reset();
 
         recordCommandBuffer(_commandBuffers->at(_currentFrame), imageIndex);
@@ -102,8 +122,7 @@ namespace lava
             result = _presentQueue->presentKHR(presentInfo);
             if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)
             {
-                recreateSwapChain();
-                return;
+                _framebufferResized = true;
             }
             else if (result != vk::Result::eSuccess)
             {
@@ -113,10 +132,15 @@ namespace lava
 #ifndef VULKAN_HPP_NO_EXCEPTIONS
         catch (const vk::OutOfDateKHRError &e)
         {
-            recreateSwapChain();
+            _framebufferResized = true;
         }
 #endif
         _currentFrame = (_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+        if (_framebufferResized)
+        {
+            _framebufferResized = false;
+            recreateSwapChain();
+        }
     }
     void App::recordCommandBuffer(const vk::raii::CommandBuffer &commandBuffer, uint32_t imageIndex)
     {
@@ -154,7 +178,12 @@ namespace lava
         scissor.setExtent(_swapchainExtent);
         commandBuffer.setScissor(0, scissor);
 
-        commandBuffer.draw(3, 1, 0, 0);
+        vk::Buffer vertexBuffers[] = {*_vertexBuffer.get()};
+        vk::DeviceSize offsets[] = {0};
+        commandBuffer.bindVertexBuffers(0, vertexBuffers, offsets);
+
+        commandBuffer.draw(static_cast<uint32_t>(_vertices.size()), 1, 0, 0);
+        //commandBuffer.draw(3, 1, 0, 0);
 
         commandBuffer.endRenderPass();
         commandBuffer.end();
@@ -175,6 +204,8 @@ namespace lava
     void App::cleanup()
     {
         cleanupSwapChain();
+        _vertexBuffer = nullptr;
+        _vertexBufferMemory = nullptr;
         _inFlightFence.clear();
         _commandBuffers->clear();
         _commandPool = nullptr;
@@ -200,6 +231,8 @@ namespace lava
     void App::initWindow()
     {
         _window = std::make_unique<core::Window>();
+        glfwSetWindowUserPointer(_window->getGLFWwindow(), this);
+        _window->setResizeHandler(handleWindowResize);
         _window->activate();
     }
 
@@ -217,6 +250,7 @@ namespace lava
         createGraphicsPipeline();
         createFrameBuffers();
         createCommandPool();
+        createVertexBuffers();
         createCommandBuffer();
         createSyncObjects();
     }
@@ -491,6 +525,15 @@ namespace lava
 
     void App::recreateSwapChain()
     {
+        // handle case where the window is minimized. the width and height is 0 in this case.
+        int width = 0, height = 0;
+        glfwGetFramebufferSize(_window->getGLFWwindow(), &width, &height);
+        while (width == 0 || height == 0)
+        {
+            glfwGetFramebufferSize(_window->getGLFWwindow(), &width, &height);
+            _window->pollEvents();
+        }
+
         _device->waitIdle();
         cleanupSwapChain();
 
@@ -501,7 +544,6 @@ namespace lava
 
     void App::createImageViews()
     {
-        // _swapchainImageViews.resize(_swapchainImages.size());
         for (size_t i = 0; i < _swapchainImages.size(); i++)
         {
             vk::ImageViewCreateInfo createInfo{};
@@ -577,8 +619,8 @@ namespace lava
 
     void App::createGraphicsPipeline()
     {
-        auto vertShaderCode = lava::resourceloader::readfile("./build/shaders/basic_vert.spv");
-        auto fragShaderCode = lava::resourceloader::readfile("./build/shaders/basic_frag.spv");
+        auto vertShaderCode = lava::resourceloader::readfile("./build/shaders/shader_vert.spv");
+        auto fragShaderCode = lava::resourceloader::readfile("./build/shaders/shader_frag.spv");
 
         vk::raii::ShaderModule vertShaderModule = createShaderModule(vertShaderCode);
         vk::raii::ShaderModule fragShaderModule = createShaderModule(fragShaderCode);
@@ -602,11 +644,14 @@ namespace lava
         dynamicState.setDynamicStateCount(static_cast<uint32_t>(dynamicStates.size()));
         dynamicState.setPDynamicStates(dynamicStates.data());
 
+        auto bindingDescription = data::Vertex::getBindingDescription();
+        auto attributeDescriptions = data::Vertex::getAttributeDescriptions();
+
         vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
-        vertexInputInfo.setVertexBindingDescriptionCount(0);
-        vertexInputInfo.setPVertexBindingDescriptions(nullptr);
-        vertexInputInfo.setVertexAttributeDescriptionCount(0);
-        vertexInputInfo.setVertexAttributeDescriptions(nullptr);
+        vertexInputInfo.setVertexBindingDescriptionCount(1);
+        vertexInputInfo.setPVertexBindingDescriptions(&bindingDescription);
+        vertexInputInfo.setVertexAttributeDescriptionCount(attributeDescriptions.size());
+        vertexInputInfo.setVertexAttributeDescriptions(attributeDescriptions);
 
         vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
         inputAssembly.setTopology(vk::PrimitiveTopology::eTriangleList);
@@ -725,6 +770,31 @@ namespace lava
         _commandPool = std::make_unique<vk::raii::CommandPool>(*_device.get(), poolInfo);
     }
 
+    void App::createVertexBuffers()
+    {
+        vk::BufferCreateInfo bufferInfo{};
+        bufferInfo.setSize(sizeof(_vertices[0]) * _vertices.size());
+        bufferInfo.setUsage(vk::BufferUsageFlagBits::eVertexBuffer);
+        bufferInfo.setUsage(vk::BufferUsageFlagBits::eVertexBuffer);
+        bufferInfo.setSharingMode(vk::SharingMode::eExclusive);
+
+        _vertexBuffer = std::make_unique<vk::raii::Buffer>(*_device.get(), bufferInfo);
+
+        auto memoryRequirements = _vertexBuffer->getMemoryRequirements();
+
+        vk::MemoryAllocateInfo allocInfo{};
+        allocInfo.setAllocationSize(memoryRequirements.size);
+        allocInfo.setMemoryTypeIndex(findMemoryType(memoryRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent));
+
+        _vertexBufferMemory = std::make_unique<vk::raii::DeviceMemory>(*_device.get(), allocInfo);
+        _vertexBuffer->bindMemory(*_vertexBufferMemory.get(), 0);
+
+        void* data = _vertexBufferMemory->mapMemory(0, bufferInfo.size);
+        memcpy(data, _vertices.data(), (size_t)bufferInfo.size);
+        _vertexBufferMemory->unmapMemory();
+
+    }
+
     void App::createCommandBuffer()
     {
         vk::CommandBufferAllocateInfo allocInfo{};
@@ -792,6 +862,25 @@ namespace lava
 
         return extensions;
     }
+
+    void App::setFrameBufferResized()
+    {
+        _framebufferResized = true;
+    }
+    
+    uint32_t App::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
+    {
+        vk::PhysicalDeviceMemoryProperties memoryProperties = _physicalDevice->getMemoryProperties();
+        for(size_t i = 0; i < memoryProperties.memoryTypeCount; i++)
+        {
+            if(typeFilter & (1 << i) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+                return i;
+            }
+        }
+        throw std::runtime_error("failed to find suitable memory type!");
+    }
+
+
     VKAPI_ATTR VkBool32 VKAPI_CALL App::debugCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
         VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -821,4 +910,11 @@ namespace lava
 
         return vk::False;
     }
+
+    void App::handleWindowResize(GLFWwindow *window, int width, int height)
+    {
+        auto app = reinterpret_cast<App *>(glfwGetWindowUserPointer(window));
+        app->setFrameBufferResized();
+    }
+
 }

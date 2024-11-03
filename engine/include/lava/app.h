@@ -1,10 +1,11 @@
 #pragma once
 
 #include <vulkan/vulkan_raii.hpp>
-#include <lava/core/window.h>
+#include "lava/core/window.h"
 #include <vector>
 #include <memory>
 #include <optional>
+#include "lava/data/vertex.h"
 namespace lava
 {
     class App
@@ -34,9 +35,13 @@ namespace lava
         void createGraphicsPipeline();
         void createFrameBuffers();
         void createCommandPool();
+        void createVertexBuffers();
         void createCommandBuffer();
         void createSyncObjects();
         void recordCommandBuffer(const vk::raii::CommandBuffer &commandBuffer, uint32_t imageIndex);
+        void setFrameBufferResized();
+
+        uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
 
         vk::raii::ShaderModule createShaderModule(const std::vector<char> &code);
 
@@ -64,6 +69,8 @@ namespace lava
             VkDebugUtilsMessageTypeFlagsEXT messageType,
             const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
             void *pUserData);
+
+        static void handleWindowResize(GLFWwindow* window, int width, int height);
 
         std::unique_ptr<vk::raii::DebugUtilsMessengerEXT> _debugMessenger;
         bool _enableValidationLayers;
@@ -95,7 +102,12 @@ namespace lava
         std::vector<vk::raii::Semaphore> _imageAvailableSemaphore;
         std::vector<vk::raii::Semaphore> _renderFinishedSemaphore;
         std::vector<vk::raii::Fence> _inFlightFence;
+        bool _framebufferResized = false;
         uint32_t _currentFrame = 0;
+
+        std::unique_ptr<vk::raii::DeviceMemory> _vertexBufferMemory;
+        std::unique_ptr<vk::raii::Buffer> _vertexBuffer;
+        std::vector<data::Vertex> _vertices;
     };
 
 }

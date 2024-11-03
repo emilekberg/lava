@@ -20,6 +20,10 @@ namespace lava::core
         HWND getWindowHandle();
         GLFWwindow* getGLFWwindow();
 
+        template <typename T>
+        void setOwner(T* owner);
+        void setResizeHandler(void(callback)(GLFWwindow* window, int width, int height));
+
     private:
         GLFWwindow* _glfwWindow;
     };
