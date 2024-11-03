@@ -1,4 +1,4 @@
-#include "lava/header.h"
+#include "lava/header.hpp"
 namespace lava
 {
     int hello_world()

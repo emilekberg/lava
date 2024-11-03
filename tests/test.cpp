@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include <lava/header.h>
+#include <lava/header.hpp>
 TEST(LAVA_ENGINE, test)
 {
     auto a = 2;

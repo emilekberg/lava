@@ -1,4 +1,4 @@
-#include <lava/core/window.h>
+#include <lava/core/window.hpp>
 namespace lava::core
 {
      Window::Window()

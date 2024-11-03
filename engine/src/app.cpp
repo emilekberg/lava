@@ -1,8 +1,9 @@
-#include "lava/app.h"
-#include "lava/vulkan/queue-family.cpp"
+#include "lava/app.hpp"
 #include <set>
-#include "lava/vulkan/swapchain-support-details.h"
-#include "lava/resourceloader.h"
+#include "lava/rendering/vulkan/queue-family.hpp"
+#include "lava/rendering/vulkan/swapchain-support-details.hpp"
+#include "lava/resourceloader.hpp"
+#define UNHANDLED_PARAMETER(param) param; 
 #undef max
 namespace lava
 {
@@ -72,6 +73,7 @@ namespace lava
 #ifndef VULKAN_HPP_NO_EXCEPTIONS
         catch (vk::OutOfDateKHRError &e)
         {
+            UNHANDLED_PARAMETER(e)
             _framebufferResized = true;
         }
 #endif
@@ -132,6 +134,7 @@ namespace lava
 #ifndef VULKAN_HPP_NO_EXCEPTIONS
         catch (const vk::OutOfDateKHRError &e)
         {
+            UNHANDLED_PARAMETER(e)
             _framebufferResized = true;
         }
 #endif
@@ -362,7 +365,7 @@ namespace lava
 
     bool App::isDeviceSuitable(const vk::raii::PhysicalDevice &physicalDevice)
     {
-        auto queueFamilyIndices = vulkan::findQueueFamilies(physicalDevice, *_surface.get());
+        auto queueFamilyIndices = rendering::vulkan::findQueueFamilies(physicalDevice, *_surface.get());
         if (!queueFamilyIndices.isComplete())
             return false;
         if (physicalDevice.getProperties().deviceType != vk::PhysicalDeviceType::eDiscreteGpu)
@@ -371,7 +374,7 @@ namespace lava
             return false;
         if (!checkDeviceExtensionsSupport(physicalDevice))
             return false;
-        lava::vulkan::SwapChainSupportDetails swapChainDetails = lava::vulkan::querySwapChainSupport(physicalDevice, *_surface.get());
+        rendering::vulkan::SwapChainSupportDetails swapChainDetails = rendering::vulkan::querySwapChainSupport(physicalDevice, *_surface.get());
         if (!swapChainDetails.isAdequate())
             return false;
         return true;
@@ -434,7 +437,7 @@ namespace lava
 
     void App::createLogicalDevice()
     {
-        vulkan::QueueFamilyIndices indices = vulkan::findQueueFamilies(*_physicalDevice.get(), *_surface.get());
+        rendering::vulkan::QueueFamilyIndices indices = rendering::vulkan::findQueueFamilies(*_physicalDevice.get(), *_surface.get());
 
         std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
         std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
@@ -475,7 +478,7 @@ namespace lava
 
     void App::createSwapChain()
     {
-        vulkan::SwapChainSupportDetails swapChainSupport = vulkan::querySwapChainSupport(*_physicalDevice.get(), *_surface.get());
+        rendering::vulkan::SwapChainSupportDetails swapChainSupport = rendering::vulkan::querySwapChainSupport(*_physicalDevice.get(), *_surface.get());
         vk::SurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
         vk::PresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
         vk::Extent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
@@ -495,7 +498,7 @@ namespace lava
         createInfo.setImageArrayLayers(1);
         createInfo.setImageUsage(vk::ImageUsageFlagBits::eColorAttachment);
 
-        vulkan::QueueFamilyIndices indices = vulkan::findQueueFamilies(*_physicalDevice.get(), *_surface.get());
+        rendering::vulkan::QueueFamilyIndices indices = rendering::vulkan::findQueueFamilies(*_physicalDevice.get(), *_surface.get());
         uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
 
         if (indices.graphicsFamily != indices.presentFamily)
@@ -644,13 +647,13 @@ namespace lava
         dynamicState.setDynamicStateCount(static_cast<uint32_t>(dynamicStates.size()));
         dynamicState.setPDynamicStates(dynamicStates.data());
 
-        auto bindingDescription = data::Vertex::getBindingDescription();
-        auto attributeDescriptions = data::Vertex::getAttributeDescriptions();
+        auto bindingDescription = rendering::vulkan::Vertex::getBindingDescription();
+        auto attributeDescriptions = rendering::vulkan::Vertex::getAttributeDescriptions();
 
         vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
         vertexInputInfo.setVertexBindingDescriptionCount(1);
         vertexInputInfo.setPVertexBindingDescriptions(&bindingDescription);
-        vertexInputInfo.setVertexAttributeDescriptionCount(attributeDescriptions.size());
+        vertexInputInfo.setVertexAttributeDescriptionCount(static_cast<uint32_t>(attributeDescriptions.size()));
         vertexInputInfo.setVertexAttributeDescriptions(attributeDescriptions);
 
         vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
@@ -761,7 +764,7 @@ namespace lava
 
     void App::createCommandPool()
     {
-        vulkan::QueueFamilyIndices queueFamilyIndices = vulkan::findQueueFamilies(*_physicalDevice.get(), *_surface.get());
+        rendering::vulkan::QueueFamilyIndices queueFamilyIndices = rendering::vulkan::findQueueFamilies(*_physicalDevice.get(), *_surface.get());
 
         vk::CommandPoolCreateInfo poolInfo{};
         poolInfo.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
@@ -871,7 +874,7 @@ namespace lava
     uint32_t App::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
     {
         vk::PhysicalDeviceMemoryProperties memoryProperties = _physicalDevice->getMemoryProperties();
-        for(size_t i = 0; i < memoryProperties.memoryTypeCount; i++)
+        for(uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
         {
             if(typeFilter & (1 << i) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
                 return i;

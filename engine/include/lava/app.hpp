@@ -1,11 +1,11 @@
 #pragma once
 
-#include <vulkan/vulkan_raii.hpp>
-#include "lava/core/window.h"
 #include <vector>
 #include <memory>
 #include <optional>
-#include "lava/data/vertex.h"
+#include <vulkan/vulkan_raii.hpp>
+#include "lava/core/window.hpp"
+#include "lava/rendering/vulkan/vertex.hpp"
 namespace lava
 {
     class App
@@ -59,7 +59,7 @@ namespace lava
             const vk::DebugUtilsMessengerCallbackDataEXT *pCallbackData,
             void *pUserData);
 
-        const size_t MAX_FRAMES_IN_FLIGHT = 2;
+        const uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
         std::unique_ptr<core::Window> _window;
         std::unique_ptr<vk::raii::Instance> _vulkanInstance;
@@ -107,7 +107,7 @@ namespace lava
 
         std::unique_ptr<vk::raii::DeviceMemory> _vertexBufferMemory;
         std::unique_ptr<vk::raii::Buffer> _vertexBuffer;
-        std::vector<data::Vertex> _vertices;
+        std::vector<rendering::vulkan::Vertex> _vertices;
     };
 
 }

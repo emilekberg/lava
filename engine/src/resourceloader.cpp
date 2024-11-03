@@ -1,4 +1,4 @@
-#include <lava/resourceloader.h>
+#include "lava/resourceloader.hpp"
 #include <fstream>
 namespace lava::resourceloader
 {

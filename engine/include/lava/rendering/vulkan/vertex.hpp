@@ -2,7 +2,7 @@
 #include <array>
 #include <glm/glm.hpp>
 #include <vulkan/vulkan_raii.hpp>
-namespace lava::data
+namespace lava::rendering::vulkan
 {
     struct Vertex
     {
