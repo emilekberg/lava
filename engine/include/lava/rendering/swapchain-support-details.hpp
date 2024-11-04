@@ -1,7 +1,7 @@
 #pragma once
 #include <vulkan/vulkan.h>
 #include <vector>
-namespace lava::rendering::vulkan
+namespace lava::rendering
 {
     struct SwapChainSupportDetails
     {

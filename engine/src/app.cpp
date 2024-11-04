@@ -1,9 +1,12 @@
 #include "lava/app.hpp"
 #include <set>
-#include "lava/rendering/vulkan/queue-family.hpp"
-#include "lava/rendering/vulkan/swapchain-support-details.hpp"
+#include "lava/rendering/queue-family.hpp"
+#include "lava/rendering/swapchain-support-details.hpp"
 #include "lava/resourceloader.hpp"
-#define UNHANDLED_PARAMETER(param) param; 
+#include "lava/rendering/graphics-pipeline-builder.hpp"
+#include "lava/rendering/shader.hpp"
+#include "lava/rendering/attribute-description-builder.hpp"
+#define UNHANDLED_PARAMETER(param) param;
 #undef max
 namespace lava
 {
@@ -20,13 +23,12 @@ namespace lava
             {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
 
             // bottom triangle
-            
+
             {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
             {{0.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
             {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
 
-
-            };
+        };
     }
     App::~App()
     {
@@ -165,7 +167,7 @@ namespace lava
 
         commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
 
-        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *_pipeline.get());
+        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, _graphicsPipeline->getVkPipeline());
 
         vk::Viewport viewport{};
         viewport.setX(0.0f);
@@ -186,7 +188,7 @@ namespace lava
         commandBuffer.bindVertexBuffers(0, vertexBuffers, offsets);
 
         commandBuffer.draw(static_cast<uint32_t>(_vertices.size()), 1, 0, 0);
-        //commandBuffer.draw(3, 1, 0, 0);
+        // commandBuffer.draw(3, 1, 0, 0);
 
         commandBuffer.endRenderPass();
         commandBuffer.end();
@@ -212,8 +214,9 @@ namespace lava
         _inFlightFence.clear();
         _commandBuffers->clear();
         _commandPool = nullptr;
-        _pipeline = nullptr;
-        _pipelineLayout = nullptr;
+        _graphicsPipeline = nullptr;
+        // _pipeline = nullptr;
+        // _pipelineLayout = nullptr;
         _renderpass = nullptr;
 
         _renderFinishedSemaphore.clear();
@@ -324,7 +327,7 @@ namespace lava
 
         for (const auto &extension : extensions)
         {
-            fprintf(stdout, "\t%s\n", extension.extensionName);
+            fprintf(stdout, "\t%s\n", static_cast<const char *>(extension.extensionName));
         }
     }
 
@@ -360,12 +363,12 @@ namespace lava
         }
 
         _physicalDevice = std::make_unique<vk::raii::PhysicalDevice>(std::move(selectedPhysicalDevice.value()));
-        fprintf(stdout, "Selected device: %s\n", _physicalDevice->getProperties().deviceName);
+        fprintf(stdout, "Selected device: %s\n", static_cast<const char*>(_physicalDevice->getProperties().deviceName));
     }
 
     bool App::isDeviceSuitable(const vk::raii::PhysicalDevice &physicalDevice)
     {
-        auto queueFamilyIndices = rendering::vulkan::findQueueFamilies(physicalDevice, *_surface.get());
+        auto queueFamilyIndices = rendering::findQueueFamilies(physicalDevice, *_surface.get());
         if (!queueFamilyIndices.isComplete())
             return false;
         if (physicalDevice.getProperties().deviceType != vk::PhysicalDeviceType::eDiscreteGpu)
@@ -374,7 +377,7 @@ namespace lava
             return false;
         if (!checkDeviceExtensionsSupport(physicalDevice))
             return false;
-        rendering::vulkan::SwapChainSupportDetails swapChainDetails = rendering::vulkan::querySwapChainSupport(physicalDevice, *_surface.get());
+        rendering::SwapChainSupportDetails swapChainDetails = rendering::querySwapChainSupport(physicalDevice, *_surface.get());
         if (!swapChainDetails.isAdequate())
             return false;
         return true;
@@ -437,7 +440,7 @@ namespace lava
 
     void App::createLogicalDevice()
     {
-        rendering::vulkan::QueueFamilyIndices indices = rendering::vulkan::findQueueFamilies(*_physicalDevice.get(), *_surface.get());
+        rendering::QueueFamilyIndices indices = rendering::findQueueFamilies(*_physicalDevice.get(), *_surface.get());
 
         std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
         std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
@@ -478,7 +481,7 @@ namespace lava
 
     void App::createSwapChain()
     {
-        rendering::vulkan::SwapChainSupportDetails swapChainSupport = rendering::vulkan::querySwapChainSupport(*_physicalDevice.get(), *_surface.get());
+        rendering::SwapChainSupportDetails swapChainSupport = rendering::querySwapChainSupport(*_physicalDevice.get(), *_surface.get());
         vk::SurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
         vk::PresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
         vk::Extent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
@@ -498,7 +501,7 @@ namespace lava
         createInfo.setImageArrayLayers(1);
         createInfo.setImageUsage(vk::ImageUsageFlagBits::eColorAttachment);
 
-        rendering::vulkan::QueueFamilyIndices indices = rendering::vulkan::findQueueFamilies(*_physicalDevice.get(), *_surface.get());
+        rendering::QueueFamilyIndices indices = rendering::findQueueFamilies(*_physicalDevice.get(), *_surface.get());
         uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
 
         if (indices.graphicsFamily != indices.presentFamily)
@@ -617,128 +620,18 @@ namespace lava
         renderPassInfo.setDependencyCount(1);
         renderPassInfo.setPDependencies(&dependency);
 
-        _renderpass = std::make_unique<vk::raii::RenderPass>(*_device.get(), renderPassInfo);
+        _renderpass = std::make_shared<vk::raii::RenderPass>(*_device.get(), renderPassInfo);
     }
 
     void App::createGraphicsPipeline()
     {
-        auto vertShaderCode = lava::resourceloader::readfile("./build/shaders/shader_vert.spv");
-        auto fragShaderCode = lava::resourceloader::readfile("./build/shaders/shader_frag.spv");
-
-        vk::raii::ShaderModule vertShaderModule = createShaderModule(vertShaderCode);
-        vk::raii::ShaderModule fragShaderModule = createShaderModule(fragShaderCode);
-
-        vk::PipelineShaderStageCreateInfo vertShaderStageInfo{};
-        vertShaderStageInfo.setStage(vk::ShaderStageFlagBits::eVertex);
-        vertShaderStageInfo.setModule(vertShaderModule);
-        vertShaderStageInfo.setPName("main");
-
-        vk::PipelineShaderStageCreateInfo fragShaderStageInfo{};
-        fragShaderStageInfo.setStage(vk::ShaderStageFlagBits::eFragment);
-        fragShaderStageInfo.setModule(fragShaderModule);
-        fragShaderStageInfo.setPName("main");
-
-        vk::PipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
-
-        std::vector<vk::DynamicState> dynamicStates = {
-            vk::DynamicState::eViewport, vk::DynamicState::eScissor};
-
-        vk::PipelineDynamicStateCreateInfo dynamicState{};
-        dynamicState.setDynamicStateCount(static_cast<uint32_t>(dynamicStates.size()));
-        dynamicState.setPDynamicStates(dynamicStates.data());
-
-        auto bindingDescription = rendering::vulkan::Vertex::getBindingDescription();
-        auto attributeDescriptions = rendering::vulkan::Vertex::getAttributeDescriptions();
-
-        vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
-        vertexInputInfo.setVertexBindingDescriptionCount(1);
-        vertexInputInfo.setPVertexBindingDescriptions(&bindingDescription);
-        vertexInputInfo.setVertexAttributeDescriptionCount(static_cast<uint32_t>(attributeDescriptions.size()));
-        vertexInputInfo.setVertexAttributeDescriptions(attributeDescriptions);
-
-        vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
-        inputAssembly.setTopology(vk::PrimitiveTopology::eTriangleList);
-        inputAssembly.setPrimitiveRestartEnable(vk::False);
-
-        vk::Viewport viewport{};
-        viewport.setX(0.0f);
-        viewport.setY(0.0f);
-        viewport.setWidth((float)_swapchainExtent.width);
-        viewport.setHeight((float)_swapchainExtent.height);
-        viewport.setMinDepth(0.0f);
-        viewport.setMaxDepth(1.0f);
-
-        vk::Rect2D scissor{};
-        scissor.setOffset({0, 0});
-        scissor.setExtent(_swapchainExtent);
-
-        vk::PipelineViewportStateCreateInfo viewportState{};
-        viewportState.setViewportCount(1);
-        viewportState.setPViewports(&viewport);
-        viewportState.setScissorCount(1);
-        viewportState.setPScissors(&scissor);
-
-        vk::PipelineRasterizationStateCreateInfo rasterizer{};
-        rasterizer.setDepthClampEnable(vk::False);
-        rasterizer.setRasterizerDiscardEnable(vk::False);
-        rasterizer.setPolygonMode(vk::PolygonMode::eFill);
-        rasterizer.setLineWidth(1.0f);
-
-        rasterizer.setCullMode(vk::CullModeFlagBits::eBack);
-        rasterizer.setFrontFace(vk::FrontFace::eClockwise);
-
-        rasterizer.setDepthBiasEnable(vk::False);
-        rasterizer.setDepthBiasConstantFactor(0.0f);
-        rasterizer.setDepthBiasClamp(0.0f);
-        rasterizer.setDepthBiasSlopeFactor(0.0f);
-
-        vk::PipelineMultisampleStateCreateInfo multisampling{};
-        multisampling.setSampleShadingEnable(vk::False);
-        multisampling.setRasterizationSamples(vk::SampleCountFlagBits::e1);
-        multisampling.setMinSampleShading(1.0f);           // Optional
-        multisampling.setPSampleMask(nullptr);             // Optional
-        multisampling.setAlphaToCoverageEnable(vk::False); // Optional
-        multisampling.setAlphaToOneEnable(vk::False);      // Optional
-
-        vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
-        colorBlendAttachment.setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
-        colorBlendAttachment.setBlendEnable(vk::False);
-        colorBlendAttachment.setSrcColorBlendFactor(vk::BlendFactor::eOne);  // Optional
-        colorBlendAttachment.setDstColorBlendFactor(vk::BlendFactor::eZero); // Optional
-        colorBlendAttachment.setColorBlendOp(vk::BlendOp::eAdd);             // Optional
-        colorBlendAttachment.setDstAlphaBlendFactor(vk::BlendFactor::eOne);  // Optional
-        colorBlendAttachment.setDstAlphaBlendFactor(vk::BlendFactor::eZero); // Optional
-        colorBlendAttachment.setAlphaBlendOp(vk::BlendOp::eAdd);             // Optional
-
-        vk::PipelineColorBlendStateCreateInfo colorBlending{};
-        colorBlending.setLogicOpEnable(vk::False);
-        colorBlending.setAttachmentCount(1);
-        colorBlending.setPAttachments(&colorBlendAttachment);
-
-        vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
-        pipelineLayoutCreateInfo.setSetLayoutCount(0);
-        pipelineLayoutCreateInfo.setPSetLayouts(nullptr);
-
-        _pipelineLayout = std::make_unique<vk::raii::PipelineLayout>(*_device.get(), pipelineLayoutCreateInfo);
-
-        vk::GraphicsPipelineCreateInfo pipelineInfo{};
-        pipelineInfo.setStageCount(2);
-        pipelineInfo.setPStages(shaderStages);
-        pipelineInfo.setPVertexInputState(&vertexInputInfo);
-        pipelineInfo.setPInputAssemblyState(&inputAssembly);
-        pipelineInfo.setPViewportState(&viewportState);
-        pipelineInfo.setPRasterizationState(&rasterizer);
-        pipelineInfo.setPMultisampleState(&multisampling);
-        pipelineInfo.setPDepthStencilState(nullptr);
-        pipelineInfo.setPColorBlendState(&colorBlending);
-        pipelineInfo.setPDynamicState(&dynamicState);
-
-        pipelineInfo.setLayout(*_pipelineLayout.get());
-        pipelineInfo.setRenderPass(*_renderpass.get());
-
-        pipelineInfo.setSubpass(0);
-
-        _pipeline = std::make_unique<vk::raii::Pipeline>(*_device.get(), nullptr, pipelineInfo);
+        _graphicsPipeline = rendering::GraphicsPipelineBuilder(*_device.get())
+            .withFragmentShader()
+            .withVertexShader()
+            .withVertexInputInfo()
+            .withExtent(_swapchainExtent)
+            .withRenderPass(_renderpass)
+            .build();
     }
 
     void App::createFrameBuffers()
@@ -764,7 +657,7 @@ namespace lava
 
     void App::createCommandPool()
     {
-        rendering::vulkan::QueueFamilyIndices queueFamilyIndices = rendering::vulkan::findQueueFamilies(*_physicalDevice.get(), *_surface.get());
+        rendering::QueueFamilyIndices queueFamilyIndices = rendering::findQueueFamilies(*_physicalDevice.get(), *_surface.get());
 
         vk::CommandPoolCreateInfo poolInfo{};
         poolInfo.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
@@ -792,10 +685,9 @@ namespace lava
         _vertexBufferMemory = std::make_unique<vk::raii::DeviceMemory>(*_device.get(), allocInfo);
         _vertexBuffer->bindMemory(*_vertexBufferMemory.get(), 0);
 
-        void* data = _vertexBufferMemory->mapMemory(0, bufferInfo.size);
+        void *data = _vertexBufferMemory->mapMemory(0, bufferInfo.size);
         memcpy(data, _vertices.data(), (size_t)bufferInfo.size);
         _vertexBufferMemory->unmapMemory();
-
     }
 
     void App::createCommandBuffer()
@@ -870,19 +762,19 @@ namespace lava
     {
         _framebufferResized = true;
     }
-    
+
     uint32_t App::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
     {
         vk::PhysicalDeviceMemoryProperties memoryProperties = _physicalDevice->getMemoryProperties();
-        for(uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
+        for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
         {
-            if(typeFilter & (1 << i) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            if (typeFilter & (1 << i) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+            {
                 return i;
             }
         }
         throw std::runtime_error("failed to find suitable memory type!");
     }
-
 
     VKAPI_ATTR VkBool32 VKAPI_CALL App::debugCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,

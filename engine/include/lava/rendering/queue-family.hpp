@@ -1,7 +1,7 @@
 #pragma once
 #include <vulkan/vulkan_raii.hpp>
 #include <optional>
-namespace lava::rendering::vulkan
+namespace lava::rendering
 {
     struct QueueFamilyIndices
     {

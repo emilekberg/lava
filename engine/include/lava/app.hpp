@@ -5,7 +5,9 @@
 #include <optional>
 #include <vulkan/vulkan_raii.hpp>
 #include "lava/core/window.hpp"
-#include "lava/rendering/vulkan/vertex.hpp"
+#include "lava/rendering/vertex.hpp"
+#include "lava/rendering/vulkan-renderer.hpp"
+#include "lava/rendering/graphics-pipeline.hpp"
 namespace lava
 {
     class App
@@ -90,9 +92,9 @@ namespace lava
 
         std::vector<vk::raii::ImageView> _swapchainImageViews;
 
-        std::unique_ptr<vk::raii::RenderPass> _renderpass;
-        std::unique_ptr<vk::raii::PipelineLayout> _pipelineLayout;
-        std::unique_ptr<vk::raii::Pipeline> _pipeline;
+        std::shared_ptr<vk::raii::RenderPass> _renderpass;
+        // std::unique_ptr<vk::raii::PipelineLayout> _pipelineLayout;
+        // std::unique_ptr<vk::raii::Pipeline> _pipeline;
 
         std::vector<vk::raii::Framebuffer> _swapchainFrameBuffers;
 
@@ -107,7 +109,9 @@ namespace lava
 
         std::unique_ptr<vk::raii::DeviceMemory> _vertexBufferMemory;
         std::unique_ptr<vk::raii::Buffer> _vertexBuffer;
-        std::vector<rendering::vulkan::Vertex> _vertices;
+        std::vector<rendering::Vertex> _vertices;
+
+        std::unique_ptr<rendering::GraphicsPipeline> _graphicsPipeline;
     };
 
 }
