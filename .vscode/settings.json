@@ -4,6 +4,7 @@
         "stdexcept": "cpp",
         "vector": "cpp",
         "initializer_list": "cpp",
-        "xutility": "cpp"
+        "xutility": "cpp",
+        "memory": "cpp"
     }
 }

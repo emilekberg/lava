@@ -8,6 +8,7 @@
 #include "lava/rendering/vertex.hpp"
 #include "lava/rendering/vulkan-renderer.hpp"
 #include "lava/rendering/graphics-pipeline.hpp"
+#include "lava/rendering/mesh.hpp"
 namespace lava
 {
     class App
@@ -25,10 +26,6 @@ namespace lava
         void cleanup();
         void initWindow();
         void initVulkan();
-        void createInstance();
-        void createDebugMessenger();
-        void createSurface();
-        void pickPhysicalDevice();
         void createLogicalDevice();
         void createSwapChain();
         void recreateSwapChain();
@@ -50,16 +47,6 @@ namespace lava
         vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats);
         vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes);
         vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities);
-
-        bool checkDeviceExtensionsSupport(const vk::raii::PhysicalDevice &physicalDevice);
-        bool isDeviceSuitable(const vk::raii::PhysicalDevice &physicalDevice);
-        bool checkValidationLayerSupport(const std::vector<const char *> &requiredValidationLayers);
-        std::vector<const char *> getRequiredExtensions();
-        static VKAPI_ATTR vk::Bool32 VKAPI_CALL vkdebugCallback(
-            vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-            vk::DebugUtilsMessageTypeFlagsEXT messageType,
-            const vk::DebugUtilsMessengerCallbackDataEXT *pCallbackData,
-            void *pUserData);
 
         const uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -109,8 +96,8 @@ namespace lava
 
         std::unique_ptr<vk::raii::DeviceMemory> _vertexBufferMemory;
         std::unique_ptr<vk::raii::Buffer> _vertexBuffer;
-        std::vector<rendering::Vertex> _vertices;
 
+        rendering::Mesh _mesh;
         std::unique_ptr<rendering::GraphicsPipeline> _graphicsPipeline;
     };
 

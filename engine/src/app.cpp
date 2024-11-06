@@ -6,6 +6,12 @@
 #include "lava/rendering/graphics-pipeline-builder.hpp"
 #include "lava/rendering/shader.hpp"
 #include "lava/rendering/attribute-description-builder.hpp"
+#include "lava/rendering/constructors/instance.hpp"
+#include "lava/rendering/constructors/debug-messenger.hpp"
+#include "lava/rendering/constructors/surface.hpp"
+#include "lava/rendering/constructors/physical-device.hpp"
+#include "lava/rendering/constructors/device.hpp"
+
 #define UNHANDLED_PARAMETER(param) param;
 #undef max
 namespace lava
@@ -16,19 +22,7 @@ namespace lava
             "VK_LAYER_KHRONOS_validation"};
         _deviceExtensions = {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-        _vertices = {
-            // top triangle
-            {{0.0f, -0.5f}, {1.0f, 1.0f, 1.0f}},
-            {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-            {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
 
-            // bottom triangle
-
-            {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-            {{0.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
-            {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-
-        };
     }
     App::~App()
     {
@@ -187,7 +181,7 @@ namespace lava
         vk::DeviceSize offsets[] = {0};
         commandBuffer.bindVertexBuffers(0, vertexBuffers, offsets);
 
-        commandBuffer.draw(static_cast<uint32_t>(_vertices.size()), 1, 0, 0);
+        commandBuffer.draw(static_cast<uint32_t>(_mesh.vertices.size()), 1, 0, 0);
         // commandBuffer.draw(3, 1, 0, 0);
 
         commandBuffer.endRenderPass();
@@ -244,161 +238,28 @@ namespace lava
 
     void App::initVulkan()
     {
-        createInstance();
-        createDebugMessenger();
-        createSurface();
-        pickPhysicalDevice();
-
-        createLogicalDevice();
+        _vulkanInstance = rendering::constructors::createInstance(_enableValidationLayers, _validationLayers);
+        _debugMessenger = rendering::constructors::createDebugMessenger(*_vulkanInstance.get());
+        _surface = rendering::constructors::createSurface(*_vulkanInstance.get(), _window->getWindowHandle());
+        _physicalDevice = rendering::constructors::pickPhysicalDevice(*_vulkanInstance.get(), *_surface.get(), _deviceExtensions);
+        
+        std::tie(_device, _presentQueue, _graphicsQueue) = rendering::constructors::createDevice(*_vulkanInstance.get(), *_physicalDevice.get(), *_surface.get(), _deviceExtensions, _validationLayers);
+        
         createSwapChain();
         createImageViews();
         createRenderPass();
-        createGraphicsPipeline();
+        _graphicsPipeline = rendering::GraphicsPipelineBuilder(*_device.get())
+            .withFragmentShader()
+            .withVertexShader()
+            .withVertexInputInfo()
+            .withExtent(_swapchainExtent)
+            .withRenderPass(_renderpass)
+            .build();
         createFrameBuffers();
         createCommandPool();
         createVertexBuffers();
         createCommandBuffer();
         createSyncObjects();
-    }
-
-    void App::createDebugMessenger()
-    {
-        if (!_enableValidationLayers)
-            return;
-        vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
-        createInfo.sType = vk::StructureType::eDebugUtilsMessengerCreateInfoEXT;
-        createInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
-        createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
-        createInfo.pfnUserCallback = debugCallback;
-        createInfo.pUserData = nullptr; // Optional
-
-        _debugMessenger = std::make_unique<vk::raii::DebugUtilsMessengerEXT>(*_vulkanInstance, createInfo, nullptr);
-        if (_debugMessenger == nullptr)
-        {
-            throw std::runtime_error("failed to set up debug messenger!");
-        }
-    }
-
-    void App::createInstance()
-    {
-        if (_enableValidationLayers && !checkValidationLayerSupport(_validationLayers))
-        {
-            throw std::runtime_error("validation layers requested, but not available!");
-        }
-
-        vk::raii::Context context;
-        uint32_t apiVersion = context.enumerateInstanceVersion();
-
-        vk::ApplicationInfo appInfo{};
-        appInfo.pApplicationName = "Hello Triangle";
-        appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.pEngineName = "No Engine";
-        appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_0;
-
-        vk::InstanceCreateInfo createInfo{};
-        createInfo.pApplicationInfo = &appInfo;
-        uint32_t glfwExtensionCount = 0;
-
-        auto requiredExtensions = getRequiredExtensions();
-
-        createInfo.flags |= vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
-
-        createInfo.enabledExtensionCount = static_cast<uint32_t>(requiredExtensions.size());
-        createInfo.ppEnabledExtensionNames = requiredExtensions.data();
-
-        if (_enableValidationLayers)
-        {
-            createInfo.enabledLayerCount = static_cast<uint32_t>(_validationLayers.size());
-            createInfo.ppEnabledLayerNames = _validationLayers.data();
-        }
-        else
-        {
-            createInfo.enabledLayerCount = 0;
-        }
-
-        _vulkanInstance = std::make_unique<vk::raii::Instance>(context, createInfo);
-        if (_vulkanInstance == nullptr)
-        {
-            throw std::runtime_error("failed to create vulkan instance");
-        }
-        std::vector<vk::ExtensionProperties> extensions = vk::enumerateInstanceExtensionProperties();
-        fprintf(stdout, "available extensions:\n");
-
-        for (const auto &extension : extensions)
-        {
-            fprintf(stdout, "\t%s\n", static_cast<const char *>(extension.extensionName));
-        }
-    }
-
-    void App::createSurface()
-    {
-        vk::Win32SurfaceCreateInfoKHR createInfo{};
-        createInfo.hwnd = _window->getWindowHandle();
-        createInfo.hinstance = GetModuleHandle(nullptr);
-        _surface = std::make_unique<vk::raii::SurfaceKHR>(*_vulkanInstance.get(), createInfo);
-    }
-
-    void App::pickPhysicalDevice()
-    {
-        auto devices = vk::raii::PhysicalDevices(*_vulkanInstance.get());
-        if (devices.size() == 0)
-        {
-            throw std::runtime_error("failed to find GPUs with vulkan support");
-        }
-
-        // find suitable device
-        std::optional<vk::raii::PhysicalDevice> selectedPhysicalDevice;
-        for (const auto &device : devices)
-        {
-            if (isDeviceSuitable(device))
-            {
-                selectedPhysicalDevice = std::move(device);
-                break;
-            }
-        }
-        if (!selectedPhysicalDevice.has_value())
-        {
-            throw std::runtime_error("failed to find a suitable GPU!");
-        }
-
-        _physicalDevice = std::make_unique<vk::raii::PhysicalDevice>(std::move(selectedPhysicalDevice.value()));
-        fprintf(stdout, "Selected device: %s\n", static_cast<const char*>(_physicalDevice->getProperties().deviceName));
-    }
-
-    bool App::isDeviceSuitable(const vk::raii::PhysicalDevice &physicalDevice)
-    {
-        auto queueFamilyIndices = rendering::findQueueFamilies(physicalDevice, *_surface.get());
-        if (!queueFamilyIndices.isComplete())
-            return false;
-        if (physicalDevice.getProperties().deviceType != vk::PhysicalDeviceType::eDiscreteGpu)
-            return false;
-        if (!physicalDevice.getFeatures().geometryShader)
-            return false;
-        if (!checkDeviceExtensionsSupport(physicalDevice))
-            return false;
-        rendering::SwapChainSupportDetails swapChainDetails = rendering::querySwapChainSupport(physicalDevice, *_surface.get());
-        if (!swapChainDetails.isAdequate())
-            return false;
-        return true;
-    }
-
-    bool App::checkDeviceExtensionsSupport(const vk::raii::PhysicalDevice &physicalDevice)
-    {
-        auto availableExtensions = physicalDevice.enumerateDeviceExtensionProperties();
-        std::set<std::string> requiredExtensions(_deviceExtensions.begin(), _deviceExtensions.end());
-
-        for (const auto &extension : availableExtensions)
-        {
-            requiredExtensions.erase(extension.extensionName);
-        }
-        if (!requiredExtensions.empty())
-        {
-            fprintf(stderr, "missing required extensions!\n");
-            // TODO: loop and log the required extensions.
-            return false;
-        }
-        return true;
     }
 
     vk::SurfaceFormatKHR App::chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats)
@@ -669,7 +530,7 @@ namespace lava
     void App::createVertexBuffers()
     {
         vk::BufferCreateInfo bufferInfo{};
-        bufferInfo.setSize(sizeof(_vertices[0]) * _vertices.size());
+        bufferInfo.setSize(sizeof(_mesh.vertices[0]) * _mesh.vertices.size());
         bufferInfo.setUsage(vk::BufferUsageFlagBits::eVertexBuffer);
         bufferInfo.setUsage(vk::BufferUsageFlagBits::eVertexBuffer);
         bufferInfo.setSharingMode(vk::SharingMode::eExclusive);
@@ -686,7 +547,7 @@ namespace lava
         _vertexBuffer->bindMemory(*_vertexBufferMemory.get(), 0);
 
         void *data = _vertexBufferMemory->mapMemory(0, bufferInfo.size);
-        memcpy(data, _vertices.data(), (size_t)bufferInfo.size);
+        memcpy(data, _mesh.vertices.data(), (size_t)bufferInfo.size);
         _vertexBufferMemory->unmapMemory();
     }
 
@@ -714,50 +575,6 @@ namespace lava
         }
     }
 
-    bool App::checkValidationLayerSupport(const std::vector<const char *> &requiredValidationLayers)
-    {
-        std::vector<vk::LayerProperties> availableLayers = vk::enumerateInstanceLayerProperties();
-
-        fprintf(stdout, "using validation layers:\n");
-        for (const char *layerName : requiredValidationLayers)
-        {
-            bool layerFound = false;
-            fprintf(stdout, "\t%s:\n", layerName);
-            for (const auto &layerProperties : availableLayers)
-            {
-                if (strcmp(layerName, layerProperties.layerName) == 0)
-                {
-                    layerFound = true;
-                    break;
-                }
-            }
-
-            if (!layerFound)
-            {
-                fprintf(stdout, "\t\tnot found, validation not supported:\n");
-                return false;
-            }
-        }
-
-        return true;
-    }
-    std::vector<const char *> App::getRequiredExtensions()
-    {
-        uint32_t glfwExtensionCount = 0;
-        const char **glfwExtensions;
-        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-        std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
-
-        if (_enableValidationLayers)
-        {
-            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-        }
-        extensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-
-        return extensions;
-    }
-
     void App::setFrameBufferResized()
     {
         _framebufferResized = true;
@@ -774,36 +591,6 @@ namespace lava
             }
         }
         throw std::runtime_error("failed to find suitable memory type!");
-    }
-
-    VKAPI_ATTR VkBool32 VKAPI_CALL App::debugCallback(
-        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-        VkDebugUtilsMessageTypeFlagsEXT messageType,
-        const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
-        void *pUserData)
-    {
-        if (messageSeverity < VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-        {
-            return VK_FALSE;
-        }
-        fprintf(stderr, "validation layer: %s\n", pCallbackData->pMessage);
-
-        return VK_FALSE;
-    }
-
-    VKAPI_ATTR vk::Bool32 VKAPI_CALL App::vkdebugCallback(
-        vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-        vk::DebugUtilsMessageTypeFlagsEXT messageType,
-        const vk::DebugUtilsMessengerCallbackDataEXT *pCallbackData,
-        void *pUserData)
-    {
-        if (messageSeverity < vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning)
-        {
-            return vk::False;
-        }
-        fprintf(stderr, "validation layer: %s\n", pCallbackData->pMessage);
-
-        return vk::False;
     }
 
     void App::handleWindowResize(GLFWwindow *window, int width, int height)
