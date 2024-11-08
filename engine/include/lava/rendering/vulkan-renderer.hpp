@@ -15,7 +15,7 @@ namespace lava::rendering
     class VulkanRenderer
     {
     public:
-        VulkanRenderer(const core::Window &window);
+        VulkanRenderer(const ScreenSize& screenSize, HWND windowHandle);
         ~VulkanRenderer();
         
         bool render();

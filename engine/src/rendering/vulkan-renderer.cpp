@@ -18,21 +18,18 @@
 #undef max
 namespace lava::rendering
 {
-    VulkanRenderer::VulkanRenderer(const core::Window &window)
+    VulkanRenderer::VulkanRenderer(const ScreenSize& screenSize, HWND windowHandle) :
+        _validationLayers({"VK_LAYER_KHRONOS_validation"}),
+        _deviceExtensions({VK_KHR_SWAPCHAIN_EXTENSION_NAME})
     {
-        _validationLayers = {
-            "VK_LAYER_KHRONOS_validation"};
-        _deviceExtensions = {
-            VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-
         _vulkanInstance = constructors::createInstance(_validationLayers);
         _debugMessenger = constructors::createDebugMessenger(*_vulkanInstance.get());
-        _surface = constructors::createSurface(*_vulkanInstance.get(), window.getWindowHandle());
+        _surface = constructors::createSurface(*_vulkanInstance.get(), windowHandle);
         _physicalDevice = constructors::pickPhysicalDevice(*_vulkanInstance.get(), *_surface.get(), _deviceExtensions);
 
         std::tie(_device, _presentQueue, _graphicsQueue) = constructors::createDevice(*_vulkanInstance.get(), *_physicalDevice.get(), *_surface.get(), _deviceExtensions, _validationLayers);
 
-        std::tie(_swapchain, _swapchainImageFormat, _swapchainExtent) = constructors::createSwapChain(*_device.get(), *_physicalDevice.get(), *_surface.get(), window.getScreenSize());
+        std::tie(_swapchain, _swapchainImageFormat, _swapchainExtent) = constructors::createSwapChain(*_device.get(), *_physicalDevice.get(), *_surface.get(), screenSize);
         _swapchainImages = _swapchain->getImages();
         _swapchainImageViews = constructors::createImageViews(*_device.get(), _swapchainImages, _swapchainImageFormat);
         _renderpass = constructors::createRenderPass(*_device.get(), _swapchainImageFormat);
@@ -86,12 +83,14 @@ namespace lava::rendering
     {
         _device->waitIdle();
         cleanupSwapChain();
+        std::unique_ptr<vk::raii::SwapchainKHR> newSwapchain;
+        std::tie(newSwapchain, _swapchainImageFormat, _swapchainExtent) = constructors::createSwapChain(*_device.get(), *_physicalDevice.get(), *_surface.get(), screenSize);
 
-        std::tie(_swapchain, _swapchainImageFormat, _swapchainExtent) = rendering::constructors::createSwapChain(*_device.get(), *_physicalDevice.get(), *_surface.get(), screenSize);
+        _swapchain = std::move(newSwapchain);
         _swapchainImages = _swapchain->getImages();
 
-        _swapchainImageViews = rendering::constructors::createImageViews(*_device.get(), _swapchainImages, _swapchainImageFormat);
-        _swapchainFrameBuffers = rendering::constructors::createFrameBuffers(*_device.get(), *_renderpass.get(), _swapchainExtent, _swapchainImageViews);
+        _swapchainImageViews = constructors::createImageViews(*_device.get(), _swapchainImages, _swapchainImageFormat);
+        _swapchainFrameBuffers = constructors::createFrameBuffers(*_device.get(), *_renderpass.get(), _swapchainExtent, _swapchainImageViews);
     }
 
     void VulkanRenderer::createVertexBuffers()
@@ -190,7 +189,6 @@ namespace lava::rendering
         if (_requiresResize)
         {
             _requiresResize = false;
-            // recreateSwapChain();
             return true;
         }
         _device->resetFences({*_inFlightFence[_currentFrame]});
@@ -253,7 +251,6 @@ namespace lava::rendering
         {
             _requiresResize = false;
             return true;
-            // recreateSwapChain();
         }
         return false;
     }

@@ -88,4 +88,26 @@ namespace lava::rendering::constructors
         auto swapchain = std::make_unique<vk::raii::SwapchainKHR>(device, createInfo, nullptr);
         return std::make_tuple(std::move(swapchain), std::move(surfaceFormat.format), extent);
     }
+
+    std::tuple<std::unique_ptr<vk::raii::SwapchainKHR>, vk::Extent2D> recreateSwapChain(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice, const vk::raii::SurfaceKHR &surface, const ScreenSize& screenSize, const vk::raii::SwapchainKHR& oldSwapChain)
+    {
+        rendering::SwapChainSupportDetails swapChainSupport = rendering::querySwapChainSupport(physicalDevice, surface);
+        vk::Extent2D extent = chooseSwapExtent(swapChainSupport.capabilities, screenSize);
+
+        uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+        if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount)
+        {
+            imageCount = swapChainSupport.capabilities.maxImageCount;
+        }
+
+        vk::SwapchainCreateInfoKHR createInfo{};
+        createInfo.setSurface(surface);
+        createInfo.setImageExtent(extent);
+
+        // use this when recreating the swapchain from the old one.
+        createInfo.setOldSwapchain(oldSwapChain);
+
+        auto swapchain = std::make_unique<vk::raii::SwapchainKHR>(device, createInfo, nullptr);
+        return std::make_tuple(std::move(swapchain), extent);
+    }
 }

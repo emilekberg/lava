@@ -5,8 +5,9 @@
 #undef max
 namespace lava
 {
-    App::App()
-        : _window(std::make_unique<core::Window>()), _vulkanRenderer(*_window.get())
+    App::App() : 
+        _window(std::make_unique<core::Window>()), 
+        _vulkanRenderer(_window->getScreenSize(), _window->getWindowHandle())
     {
         glfwSetWindowUserPointer(_window->getGLFWwindow(), this);
         _window->setResizeHandler(handleWindowResize);
@@ -32,19 +33,20 @@ namespace lava
         bool requiresResize = false;
         while (!_window->shouldClose())
         {
+            update();
             if(requiresResize)
             {
                 rendering::ScreenSize screenSize = _window->getScreenSize();
+                // pauses while screen is minimized.
+                // add sleep?
                 while(screenSize.width == 0 || screenSize.height == 0)
                 {
                     _window->pollEvents();
                     screenSize = _window->getScreenSize();
                 }
                 _vulkanRenderer.resize(screenSize);
-                // do resize stuff
             }
             _window->pollEvents();
-            update();
             requiresResize = _vulkanRenderer.render();
         }
         _vulkanRenderer.waitUntilIdle();
