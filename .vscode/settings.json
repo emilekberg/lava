@@ -6,6 +6,10 @@
         "initializer_list": "cpp",
         "xutility": "cpp",
         "memory": "cpp",
-        "type_traits": "cpp"
+        "type_traits": "cpp",
+        "xiosbase": "cpp",
+        "deque": "cpp",
+        "forward_list": "cpp",
+        "list": "cpp"
     }
 }

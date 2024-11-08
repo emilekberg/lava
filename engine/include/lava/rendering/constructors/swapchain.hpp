@@ -2,6 +2,7 @@
 #include <vulkan/vulkan_raii.hpp>
 #include <glfw/glfw3.h>
 #include "lava/core/window.hpp"
+#include "lava/rendering/screensize.hpp"
 namespace lava::rendering::constructors
 {
     vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats)
@@ -22,31 +23,30 @@ namespace lava::rendering::constructors
         }
         return vk::PresentModeKHR::eFifo;
     }
-    vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities, const core::Window& window)
+    vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities, const ScreenSize& screenSize)
     {
         constexpr uint32_t max_width{std::numeric_limits<uint32_t>::max()};
         if (capabilities.currentExtent.height != max_width)
         {
             return capabilities.currentExtent;
         }
-        int width, height;
-        std::tie(width, height) = window.getSize();
+
         // glfwGetFramebufferSize(window.getGLFWwindow(), &width, &height);
         vk::Extent2D actualExtent = {
-            static_cast<uint32_t>(width),
-            static_cast<uint32_t>(height)};
+            static_cast<uint32_t>(screenSize.width),
+            static_cast<uint32_t>(screenSize.height)};
 
         actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
         actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 
         return actualExtent;
     }
-    std::tuple<std::unique_ptr<vk::raii::SwapchainKHR>, vk::Format, vk::Extent2D> createSwapChain(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice, const vk::raii::SurfaceKHR &surface, const core::Window& window)
+    std::tuple<std::unique_ptr<vk::raii::SwapchainKHR>, vk::Format, vk::Extent2D> createSwapChain(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice, const vk::raii::SurfaceKHR &surface, const ScreenSize& screenSize)
     {
         rendering::SwapChainSupportDetails swapChainSupport = rendering::querySwapChainSupport(physicalDevice, surface);
         vk::SurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
         vk::PresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
-        vk::Extent2D extent = chooseSwapExtent(swapChainSupport.capabilities, window);
+        vk::Extent2D extent = chooseSwapExtent(swapChainSupport.capabilities, screenSize);
 
         uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
         if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount)

@@ -4,6 +4,7 @@
 #define GLFW_EXPOSE_NATIVE_WIN31
 #include <GLFW/glfw3native.h>
 #include <tuple>
+#include "lava/rendering/screensize.hpp"
 namespace lava::core
 {
     class Window
@@ -18,8 +19,9 @@ namespace lava::core
         void activate();
 
         std::tuple<int, int> getSize() const;
+        rendering::ScreenSize getScreenSize() const;
 
-        HWND getWindowHandle();
+        HWND getWindowHandle() const;
         GLFWwindow* getGLFWwindow();
 
         template <typename T>

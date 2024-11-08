@@ -39,11 +39,17 @@ namespace lava::core
      std::tuple<int, int> Window::getSize() const
      {
           int width, height;
-          // glfwGetFramebufferSize(_glfwWindow, &width, &height);
+          glfwGetFramebufferSize(_glfwWindow, &width, &height);
           return std::make_tuple(width, height);
      }
+     rendering::ScreenSize Window::getScreenSize() const
+     {
+          rendering::ScreenSize screenSize{};
+          glfwGetFramebufferSize(_glfwWindow, &screenSize.width, &screenSize.height);
+          return screenSize;
+     }
 
-     HWND Window::getWindowHandle()
+     HWND Window::getWindowHandle() const
      {
 #ifdef GLFW_EXPOSE_NATIVE_WIN32
           return glfwGetWin32Window(_glfwWindow);

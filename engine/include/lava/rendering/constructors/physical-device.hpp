@@ -3,6 +3,7 @@
 #include <memory>
 #include <optional>
 #include <vector>
+#include <set>
 #include "lava/rendering/queue-family.hpp"
 #include "lava/rendering/swapchain-support-details.hpp"
 namespace lava::rendering::constructors
