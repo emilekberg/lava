@@ -1,4 +1,4 @@
-#include "lava/rendering/graphics-pipeline-builder.hpp"
+#include "lava/rendering/graphics-pipeline.hpp"
 
 namespace lava::rendering
 {

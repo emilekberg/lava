@@ -35,6 +35,14 @@ namespace lava::core
      {
           glfwMakeContextCurrent(_glfwWindow);
      }
+     
+     std::tuple<int, int> Window::getSize() const
+     {
+          int width, height;
+          // glfwGetFramebufferSize(_glfwWindow, &width, &height);
+          return std::make_tuple(width, height);
+     }
+
      HWND Window::getWindowHandle()
      {
 #ifdef GLFW_EXPOSE_NATIVE_WIN32

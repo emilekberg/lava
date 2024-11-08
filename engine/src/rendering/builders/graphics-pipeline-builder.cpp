@@ -1,7 +1,7 @@
-#include "lava/rendering/graphics-pipeline-builder.hpp"
+#include "lava/rendering/builders/graphics-pipeline-builder.hpp"
 #include "lava/resourceloader.hpp"
 #include "lava/rendering/vertex.hpp"
-namespace lava::rendering
+namespace lava::rendering::builders
 {
     GraphicsPipelineBuilder::GraphicsPipelineBuilder(const vk::raii::Device &device)
         : _device(device)

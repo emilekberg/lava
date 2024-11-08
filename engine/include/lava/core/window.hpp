@@ -3,7 +3,7 @@
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN31
 #include <GLFW/glfw3native.h>
-
+#include <tuple>
 namespace lava::core
 {
     class Window
@@ -16,6 +16,8 @@ namespace lava::core
         bool shouldClose();
         void pollEvents();
         void activate();
+
+        std::tuple<int, int> getSize() const;
 
         HWND getWindowHandle();
         GLFWwindow* getGLFWwindow();

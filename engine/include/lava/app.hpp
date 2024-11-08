@@ -26,13 +26,9 @@ namespace lava
         void cleanup();
         void initWindow();
         void initVulkan();
-        void createLogicalDevice();
-        void createSwapChain();
         void recreateSwapChain();
-        void createImageViews();
         void createRenderPass();
         void createGraphicsPipeline();
-        void createFrameBuffers();
         void createCommandPool();
         void createVertexBuffers();
         void createCommandBuffer();
@@ -62,7 +58,6 @@ namespace lava
         static void handleWindowResize(GLFWwindow* window, int width, int height);
 
         std::unique_ptr<vk::raii::DebugUtilsMessengerEXT> _debugMessenger;
-        bool _enableValidationLayers;
         std::vector<const char *> _validationLayers;
         std::vector<const char *> _deviceExtensions;
 

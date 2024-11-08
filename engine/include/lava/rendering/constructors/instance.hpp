@@ -49,9 +49,9 @@ namespace lava::rendering::constructors
         return true;
     }
  
-    std::unique_ptr<vk::raii::Instance> createInstance(bool enableValidationLayers, std::vector<const char *> validationLayers)
+    std::unique_ptr<vk::raii::Instance> createInstance(std::vector<const char *> validationLayers)
     {
-        if (enableValidationLayers && !checkValidationLayerSupport(validationLayers))
+        if (!validationLayers.empty() && !checkValidationLayerSupport(validationLayers))
         {
             throw std::runtime_error("validation layers requested, but not available!");
         }
@@ -62,7 +62,7 @@ namespace lava::rendering::constructors
         vk::ApplicationInfo appInfo{};
         appInfo.pApplicationName = "Hello Triangle";
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.pEngineName = "No Engine";
+        appInfo.pEngineName = "Lava";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_0;
 
@@ -70,22 +70,15 @@ namespace lava::rendering::constructors
         createInfo.pApplicationInfo = &appInfo;
         uint32_t glfwExtensionCount = 0;
 
-        auto requiredExtensions = getRequiredExtensions(enableValidationLayers);
+        auto requiredExtensions = getRequiredExtensions(!validationLayers.empty());
 
         createInfo.flags |= vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
 
         createInfo.enabledExtensionCount = static_cast<uint32_t>(requiredExtensions.size());
         createInfo.ppEnabledExtensionNames = requiredExtensions.data();
 
-        if (enableValidationLayers)
-        {
-            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-            createInfo.ppEnabledLayerNames = validationLayers.data();
-        }
-        else
-        {
-            createInfo.enabledLayerCount = 0;
-        }
+        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+        createInfo.ppEnabledLayerNames = validationLayers.data();
 
         auto instance = std::make_unique<vk::raii::Instance>(context, createInfo);
         if (instance == nullptr)

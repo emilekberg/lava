@@ -1,10 +1,10 @@
 #pragma once
 #include <vulkan/vulkan_raii.hpp>
 #include <vector>
-#include "./graphics-pipeline.hpp"
+#include "lava/rendering/graphics-pipeline.hpp"
 #include <optional>
 #include <memory>
-namespace lava::rendering
+namespace lava::rendering::builders
 {
     class GraphicsPipelineBuilder
     {
