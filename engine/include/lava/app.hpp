@@ -27,9 +27,6 @@ namespace lava
         void initWindow();
         void initVulkan();
         void recreateSwapChain();
-        void createRenderPass();
-        void createGraphicsPipeline();
-        void createCommandPool();
         void createVertexBuffers();
         void createCommandBuffer();
         void createSyncObjects();
@@ -38,22 +35,10 @@ namespace lava
 
         uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
 
-        vk::raii::ShaderModule createShaderModule(const std::vector<char> &code);
-
-        vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats);
-        vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes);
-        vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities);
-
         const uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
         std::unique_ptr<core::Window> _window;
         std::unique_ptr<vk::raii::Instance> _vulkanInstance;
-
-        static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-            VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-            VkDebugUtilsMessageTypeFlagsEXT messageType,
-            const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
-            void *pUserData);
 
         static void handleWindowResize(GLFWwindow* window, int width, int height);
 

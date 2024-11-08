@@ -126,14 +126,6 @@ namespace lava
         _swapchainFrameBuffers = rendering::constructors::createFrameBuffers(*_device.get(), *_renderpass.get(), _swapchainExtent, _swapchainImageViews);
     }
 
-    vk::raii::ShaderModule App::createShaderModule(const std::vector<char> &code)
-    {
-        vk::ShaderModuleCreateInfo createInfo{};
-        createInfo.setCodeSize(code.size());
-        createInfo.setPCode(reinterpret_cast<const uint32_t *>(code.data()));
-        return vk::raii::ShaderModule(*_device.get(), createInfo);
-    }
-
     void App::createVertexBuffers()
     {
         vk::BufferCreateInfo bufferInfo{};
