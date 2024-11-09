@@ -12,39 +12,40 @@ namespace lava::rendering::builders
     {
     }
 
-    GraphicsPipelineBuilder &GraphicsPipelineBuilder::withFragmentShader()
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::withFragmentShader(const std::string& path)
     {
-        auto fragShaderCode = lava::resourceloader::readfile("./build/shaders/shader_frag.spv");
+        auto fragShaderCode = lava::resourceloader::readfile(path);
 
         _fragmentShaderModule = createShaderModule(fragShaderCode);
 
         vk::PipelineShaderStageCreateInfo fragShaderStageInfo{};
-        fragShaderStageInfo.setStage(vk::ShaderStageFlagBits::eFragment);
-        fragShaderStageInfo.setModule(_fragmentShaderModule.value());
-        fragShaderStageInfo.setPName("main");
+        fragShaderStageInfo.setStage(vk::ShaderStageFlagBits::eFragment)
+            .setModule(_fragmentShaderModule.value())
+            .setPName("main");
 
         _fragmentCreateInfo = fragShaderStageInfo;
         return *this;
     }
-    GraphicsPipelineBuilder &GraphicsPipelineBuilder::withVertexShader()
+    
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::withVertexShader(const std::string& path)
     {
-        auto vertShaderCode = lava::resourceloader::readfile("./build/shaders/shader_vert.spv");
+        auto vertShaderCode = lava::resourceloader::readfile(path);
 
         _vertexShaderModule = createShaderModule(vertShaderCode);
 
         vk::PipelineShaderStageCreateInfo vertShaderStageInfo{};
-        vertShaderStageInfo.setStage(vk::ShaderStageFlagBits::eVertex);
-        vertShaderStageInfo.setModule(_vertexShaderModule.value());
-        vertShaderStageInfo.setPName("main");
+        vertShaderStageInfo.setStage(vk::ShaderStageFlagBits::eVertex)
+            .setModule(_vertexShaderModule.value())
+            .setPName("main");
 
         _vertexCreateInfo = vertShaderStageInfo;
         return *this;
     }
 
-    GraphicsPipelineBuilder &GraphicsPipelineBuilder::withVertexInputInfo()
+    GraphicsPipelineBuilder &GraphicsPipelineBuilder::withVertexInputInfo(const vk::VertexInputBindingDescription& bindingDescription, const std::vector<vk::VertexInputAttributeDescription>& attributeDescription)
     {
-        _bindingDescription = Vertex::getBindingDescription();
-        _attributeDescription = Vertex::getAttributeDescriptions();
+        _bindingDescription = std::move(bindingDescription);
+        _attributeDescription = std::move(attributeDescription);
 
         vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
         vertexInputInfo.setVertexBindingDescriptionCount(1);

@@ -28,6 +28,7 @@ namespace lava::rendering
         void cleanupSwapChain();
         void recreateSwapChain(const ScreenSize& screenSize);
         void createVertexBuffers();
+        void createIndexBuffers();
         void createCommandBuffer();
         void createSyncObjects();
         void recordCommandBuffer(const vk::raii::CommandBuffer &commandBuffer, uint32_t imageIndex);
@@ -72,6 +73,8 @@ namespace lava::rendering
 
         std::unique_ptr<vk::raii::DeviceMemory> _vertexBufferMemory;
         std::unique_ptr<vk::raii::Buffer> _vertexBuffer;
+        std::unique_ptr<vk::raii::DeviceMemory> _indexBufferMemory;
+        std::unique_ptr<vk::raii::Buffer> _indexBuffer;
 
         rendering::Mesh _mesh;
         std::unique_ptr<rendering::GraphicsPipeline> _graphicsPipeline;

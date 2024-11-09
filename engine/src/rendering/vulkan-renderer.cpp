@@ -12,6 +12,7 @@
 #include "lava/rendering/constructors/renderpass.hpp"
 #include "lava/rendering/constructors/framebuffers.hpp"
 #include "lava/rendering/constructors/commandpool.hpp"
+#include "lava/rendering/constructors/buffer.hpp"
 #include "lava/core/window.hpp"
 
 #define UNHANDLED_PARAMETER(param) param;
@@ -34,15 +35,16 @@ namespace lava::rendering
         _swapchainImageViews = constructors::createImageViews(*_device.get(), _swapchainImages, _swapchainImageFormat);
         _renderpass = constructors::createRenderPass(*_device.get(), _swapchainImageFormat);
         _graphicsPipeline = builders::GraphicsPipelineBuilder(*_device.get())
-                                .withFragmentShader()
-                                .withVertexShader()
-                                .withVertexInputInfo()
+                                .withFragmentShader("./build/shaders/shader_frag.spv")
+                                .withVertexShader("./build/shaders/shader_vert.spv")
+                                .withVertexInputInfo(Vertex::getBindingDescription(), Vertex::getAttributeDescriptions())
                                 .withExtent(_swapchainExtent)
                                 .withRenderPass(_renderpass)
                                 .build();
         _swapchainFrameBuffers = constructors::createFrameBuffers(*_device.get(), *_renderpass.get(), _swapchainExtent, _swapchainImageViews);
         _commandPool = constructors::createCommandPool(*_device.get(), *_physicalDevice.get(), *_surface.get());
         createVertexBuffers();
+        createIndexBuffers();
         createCommandBuffer();
         createSyncObjects();
     }
@@ -52,6 +54,8 @@ namespace lava::rendering
         cleanupSwapChain();
         _vertexBuffer = nullptr;
         _vertexBufferMemory = nullptr;
+        _indexBuffer = nullptr;
+        _indexBufferMemory = nullptr;
         _inFlightFence.clear();
         _commandBuffers->clear();
         _commandPool = nullptr;
@@ -95,26 +99,20 @@ namespace lava::rendering
 
     void VulkanRenderer::createVertexBuffers()
     {
-        vk::BufferCreateInfo bufferInfo{};
-        bufferInfo.setSize(sizeof(_mesh.vertices[0]) * _mesh.vertices.size());
-        bufferInfo.setUsage(vk::BufferUsageFlagBits::eVertexBuffer);
-        bufferInfo.setUsage(vk::BufferUsageFlagBits::eVertexBuffer);
-        bufferInfo.setSharingMode(vk::SharingMode::eExclusive);
-
-        _vertexBuffer = std::make_unique<vk::raii::Buffer>(*_device.get(), bufferInfo);
-
-        auto memoryRequirements = _vertexBuffer->getMemoryRequirements();
-
-        vk::MemoryAllocateInfo allocInfo{};
-        allocInfo.setAllocationSize(memoryRequirements.size);
-        allocInfo.setMemoryTypeIndex(findMemoryType(memoryRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent));
-
-        _vertexBufferMemory = std::make_unique<vk::raii::DeviceMemory>(*_device.get(), allocInfo);
-        _vertexBuffer->bindMemory(*_vertexBufferMemory.get(), 0);
-
-        void *data = _vertexBufferMemory->mapMemory(0, bufferInfo.size);
-        memcpy(data, _mesh.vertices.data(), (size_t)bufferInfo.size);
+        vk::DeviceSize bufferSize = sizeof(_mesh.vertices[0]) * _mesh.vertices.size();
+        std::tie(_vertexBuffer, _vertexBufferMemory) = lava::rendering::constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        void *data = _vertexBufferMemory->mapMemory(0, bufferSize);
+        memcpy(data, _mesh.vertices.data(), (size_t)bufferSize);
         _vertexBufferMemory->unmapMemory();
+    }
+
+    void VulkanRenderer::createIndexBuffers()
+    {
+        vk::DeviceSize bufferSize = sizeof(_mesh.indices[0]) * _mesh.indices.size();
+        std::tie(_indexBuffer, _indexBufferMemory) = lava::rendering::constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        void *data = _indexBufferMemory->mapMemory(0, bufferSize);
+        memcpy(data, _mesh.indices.data(), (size_t)bufferSize);
+        _indexBufferMemory->unmapMemory();
     }
 
     void VulkanRenderer::createCommandBuffer()
@@ -144,19 +142,6 @@ namespace lava::rendering
     void VulkanRenderer::requireResize()
     {
         _requiresResize = true;
-    }
-
-    uint32_t VulkanRenderer::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
-    {
-        vk::PhysicalDeviceMemoryProperties memoryProperties = _physicalDevice->getMemoryProperties();
-        for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
-        {
-            if (typeFilter & (1 << i) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
-            {
-                return i;
-            }
-        }
-        throw std::runtime_error("failed to find suitable memory type!");
     }
 
     bool VulkanRenderer::render()
@@ -291,10 +276,13 @@ namespace lava::rendering
         commandBuffer.setScissor(0, scissor);
 
         vk::Buffer vertexBuffers[] = {*_vertexBuffer.get()};
+        vk::Buffer indexBuffers[] = {*_indexBuffer.get()};
         vk::DeviceSize offsets[] = {0};
         commandBuffer.bindVertexBuffers(0, vertexBuffers, offsets);
+        commandBuffer.bindIndexBuffer(*_indexBuffer.get(), {0}, vk::IndexType::eUint32);
 
-        commandBuffer.draw(static_cast<uint32_t>(_mesh.vertices.size()), 1, 0, 0);
+        commandBuffer.drawIndexed(static_cast<uint32_t>(_mesh.indices.size()), 1, 0, 0, 0);
+        // commandBuffer.draw(static_cast<uint32_t>(_mesh.vertices.size()), 1, 0, 0);
         // commandBuffer.draw(3, 1, 0, 0);
 
         commandBuffer.endRenderPass();

@@ -18,9 +18,10 @@ namespace lava::rendering
             return bindingDescription;
         }
 
-        static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions()
+        static std::vector<vk::VertexInputAttributeDescription> getAttributeDescriptions()
         {
-            std::array<vk::VertexInputAttributeDescription, 2> attributeDescriptions{};
+            std::vector<vk::VertexInputAttributeDescription> attributeDescriptions{};
+            attributeDescriptions.resize(2);
             attributeDescriptions[0].setBinding(0);
             attributeDescriptions[0].setLocation(0);
             attributeDescriptions[0].setFormat(vk::Format::eR32G32Sfloat);
