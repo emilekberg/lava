@@ -43,6 +43,8 @@ namespace lava::rendering
                                 .build();
         _swapchainFrameBuffers = constructors::createFrameBuffers(*_device.get(), *_renderpass.get(), _swapchainExtent, _swapchainImageViews);
         _commandPool = constructors::createCommandPool(*_device.get(), *_physicalDevice.get(), *_surface.get());
+        _shortlivedCommandPool = constructors::createTransientCommandPool(*_device.get(), *_physicalDevice.get(), *_surface.get());
+
         createVertexBuffers();
         createIndexBuffers();
         createCommandBuffer();
@@ -59,6 +61,7 @@ namespace lava::rendering
         _inFlightFence.clear();
         _commandBuffers->clear();
         _commandPool = nullptr;
+        _shortlivedCommandPool = nullptr;
         _graphicsPipeline = nullptr;
         _renderpass = nullptr;
 
@@ -97,13 +100,55 @@ namespace lava::rendering
         _swapchainFrameBuffers = constructors::createFrameBuffers(*_device.get(), *_renderpass.get(), _swapchainExtent, _swapchainImageViews);
     }
 
+    void VulkanRenderer::copyBuffer(const vk::raii::Buffer& sourceBuffer, const vk::raii::Buffer& destinationBuffer, vk::DeviceSize size)
+    {
+        vk::CommandBufferAllocateInfo allocInfo{};
+        allocInfo.setLevel(vk::CommandBufferLevel::ePrimary)
+            .setCommandPool(*_commandPool.get())
+            .setCommandBufferCount(1);
+
+        vk::raii::CommandBuffers commandBuffers(*_device.get(), allocInfo);
+        const vk::raii::CommandBuffer commandBuffer = std::move(commandBuffers[0]);
+
+        vk::CommandBufferBeginInfo beginInfo{};
+        beginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+        commandBuffer.begin(beginInfo);
+        vk::BufferCopy copyRegion;
+
+        copyRegion
+            .setSrcOffset(0)
+            .setDstOffset(0)
+            .setSize(size);
+        commandBuffer.copyBuffer(sourceBuffer, destinationBuffer, copyRegion);
+        commandBuffer.end();
+
+        vk::CommandBuffer tmpCommandBuffers[] = {commandBuffer};
+
+        vk::SubmitInfo submitInfo{};
+        submitInfo
+            .setCommandBufferCount(1)
+            .setCommandBuffers(tmpCommandBuffers);
+        
+        _graphicsQueue->submit(submitInfo, VK_NULL_HANDLE);
+        _graphicsQueue->waitIdle();
+        
+    }
+
+
     void VulkanRenderer::createVertexBuffers()
     {
         vk::DeviceSize bufferSize = sizeof(_mesh.vertices[0]) * _mesh.vertices.size();
-        std::tie(_vertexBuffer, _vertexBufferMemory) = lava::rendering::constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-        void *data = _vertexBufferMemory->mapMemory(0, bufferSize);
+        std::unique_ptr<vk::raii::Buffer> stagingBuffer;
+        std::unique_ptr<vk::raii::DeviceMemory> stagingBufferMemory;
+
+        std::tie(stagingBuffer, stagingBufferMemory) = lava::rendering::constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        
+        void *data = stagingBufferMemory->mapMemory(0, bufferSize);
         memcpy(data, _mesh.vertices.data(), (size_t)bufferSize);
-        _vertexBufferMemory->unmapMemory();
+        stagingBufferMemory->unmapMemory();
+
+        std::tie(_vertexBuffer, _vertexBufferMemory) = lava::rendering::constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
+        copyBuffer(*stagingBuffer.get(), *_vertexBuffer.get(), bufferSize);
     }
 
     void VulkanRenderer::createIndexBuffers()

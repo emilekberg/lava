@@ -29,11 +29,10 @@ namespace lava::rendering
         void recreateSwapChain(const ScreenSize& screenSize);
         void createVertexBuffers();
         void createIndexBuffers();
+        void copyBuffer(const vk::raii::Buffer& sourceBuffer, const vk::raii::Buffer& destinationBuffer, vk::DeviceSize size);
         void createCommandBuffer();
         void createSyncObjects();
         void recordCommandBuffer(const vk::raii::CommandBuffer &commandBuffer, uint32_t imageIndex);
-
-        uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
 
         const uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -64,6 +63,8 @@ namespace lava::rendering
 
         std::unique_ptr<vk::raii::CommandPool> _commandPool;
         std::unique_ptr<vk::raii::CommandBuffers> _commandBuffers;
+        std::unique_ptr<vk::raii::CommandPool> _shortlivedCommandPool;
+
 
         std::vector<vk::raii::Semaphore> _imageAvailableSemaphore;
         std::vector<vk::raii::Semaphore> _renderFinishedSemaphore;

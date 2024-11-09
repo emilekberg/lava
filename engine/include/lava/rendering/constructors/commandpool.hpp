@@ -14,4 +14,15 @@ namespace lava::rendering::constructors
 
         return std::make_unique<vk::raii::CommandPool>(device, poolInfo);
     }
+
+    std::unique_ptr<vk::raii::CommandPool> createTransientCommandPool(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice, const vk::raii::SurfaceKHR& surface)
+    {
+        rendering::QueueFamilyIndices queueFamilyIndices = rendering::findQueueFamilies(physicalDevice, surface);
+
+        vk::CommandPoolCreateInfo poolInfo{};
+        poolInfo.setFlags(vk::CommandPoolCreateFlagBits::eTransient);
+        poolInfo.setQueueFamilyIndex(queueFamilyIndices.graphicsFamily.value());
+
+        return std::make_unique<vk::raii::CommandPool>(device, poolInfo);
+    }
 }
