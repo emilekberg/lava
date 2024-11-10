@@ -3,12 +3,13 @@
 #include <memory>
 #include <optional>
 #include <vulkan/vulkan_raii.hpp>
-#include "lava/rendering/vertex.hpp"
+#include "lava/rendering/data/vertex.hpp"
 #include "lava/rendering/vulkan-renderer.hpp"
 #include "lava/rendering/graphics-pipeline.hpp"
-#include "lava/rendering/mesh.hpp"
+#include "lava/rendering/data/mesh.hpp"
 #include "lava/rendering/screensize.hpp"
 #include "lava/core/window.hpp"
+#include "lava/rendering/data/uniform-buffer-object.hpp"
 
 namespace lava::rendering
 {
@@ -29,10 +30,15 @@ namespace lava::rendering
         void recreateSwapChain(const ScreenSize& screenSize);
         void createVertexBuffers();
         void createIndexBuffers();
+        void createUniformBuffers();
+        void createDescriptorPool();
+        void createDescriptorSets();
         void copyBuffer(const vk::raii::Buffer& sourceBuffer, const vk::raii::Buffer& destinationBuffer, vk::DeviceSize size);
         void createCommandBuffer();
         void createSyncObjects();
+        void createDescriptorSetLayout();
         void recordCommandBuffer(const vk::raii::CommandBuffer &commandBuffer, uint32_t imageIndex);
+        void updateUniformBuffer(uint32_t currentImage);
 
         const uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -56,8 +62,6 @@ namespace lava::rendering
         std::vector<vk::raii::ImageView> _swapchainImageViews;
 
         std::shared_ptr<vk::raii::RenderPass> _renderpass;
-        // std::unique_ptr<vk::raii::PipelineLayout> _pipelineLayout;
-        // std::unique_ptr<vk::raii::Pipeline> _pipeline;
 
         std::vector<vk::raii::Framebuffer> _swapchainFrameBuffers;
 
@@ -76,8 +80,14 @@ namespace lava::rendering
         std::unique_ptr<vk::raii::Buffer> _vertexBuffer;
         std::unique_ptr<vk::raii::DeviceMemory> _indexBufferMemory;
         std::unique_ptr<vk::raii::Buffer> _indexBuffer;
+        std::vector<std::unique_ptr<vk::raii::DeviceMemory>> _uniformBufferMemories;
+        std::vector<std::unique_ptr<vk::raii::Buffer>> _uniformBuffers;
+        std::vector<void*> _uniformBuffersMapped;
 
-        rendering::Mesh _mesh;
+        rendering::data::Mesh _mesh;
         std::unique_ptr<rendering::GraphicsPipeline> _graphicsPipeline;
+        std::unique_ptr<vk::raii::DescriptorSetLayout> _descriptorSetLayout;
+        std::unique_ptr<vk::raii::DescriptorPool> _descriptorPool;
+        std::unique_ptr<vk::raii::DescriptorSets> _descriptorSets;
     };
 }

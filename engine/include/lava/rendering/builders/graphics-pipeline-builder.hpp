@@ -17,8 +17,7 @@ namespace lava::rendering::builders
         GraphicsPipelineBuilder& withVertexInputInfo(const vk::VertexInputBindingDescription& bindingDescription, const std::vector<vk::VertexInputAttributeDescription>& attributeDescription);
         GraphicsPipelineBuilder& withExtent(const vk::Extent2D& extent);
         GraphicsPipelineBuilder& withRenderPass(std::shared_ptr<vk::raii::RenderPass> renderPass);
-
-        std::unique_ptr<GraphicsPipeline> build();
+        std::unique_ptr<GraphicsPipeline> build(const vk::raii::DescriptorSetLayout& layout);
 
     private:
         vk::raii::ShaderModule createShaderModule(const std::vector<char> &code);
@@ -31,7 +30,6 @@ namespace lava::rendering::builders
         std::optional<vk::VertexInputBindingDescription> _bindingDescription;
         std::optional<std::vector<vk::VertexInputAttributeDescription>> _attributeDescription;
         std::optional<vk::PipelineVertexInputStateCreateInfo> _vertexInputInfo;
-        
         
         std::optional<vk::Extent2D> _extent;
         std::shared_ptr<vk::raii::RenderPass> _renderPass;

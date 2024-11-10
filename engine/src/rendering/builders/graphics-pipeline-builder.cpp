@@ -1,6 +1,5 @@
 #include "lava/rendering/builders/graphics-pipeline-builder.hpp"
 #include "lava/resourceloader.hpp"
-#include "lava/rendering/vertex.hpp"
 namespace lava::rendering::builders
 {
     GraphicsPipelineBuilder::GraphicsPipelineBuilder(const vk::raii::Device &device)
@@ -68,7 +67,7 @@ namespace lava::rendering::builders
         return *this;
     }
 
-    std::unique_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build()
+    std::unique_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build(const vk::raii::DescriptorSetLayout& layout)
     {
         vk::PipelineShaderStageCreateInfo shaderStages[] = {_vertexCreateInfo.value(), _fragmentCreateInfo.value()};
         std::vector<vk::DynamicState> dynamicStates = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
@@ -105,7 +104,7 @@ namespace lava::rendering::builders
         rasterizer.setLineWidth(1.0f);
 
         rasterizer.setCullMode(vk::CullModeFlagBits::eBack);
-        rasterizer.setFrontFace(vk::FrontFace::eClockwise);
+        rasterizer.setFrontFace(vk::FrontFace::eCounterClockwise);
 
         rasterizer.setDepthBiasEnable(vk::False);
         rasterizer.setDepthBiasConstantFactor(0.0f);
@@ -135,9 +134,13 @@ namespace lava::rendering::builders
         colorBlending.setAttachmentCount(1);
         colorBlending.setPAttachments(&colorBlendAttachment);
 
+        std::vector<vk::DescriptorSetLayout> layouts
+        {
+            layout
+        };
         vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
-        pipelineLayoutCreateInfo.setSetLayoutCount(0);
-        pipelineLayoutCreateInfo.setPSetLayouts(nullptr);
+        pipelineLayoutCreateInfo.setSetLayoutCount(1);
+        pipelineLayoutCreateInfo.setPSetLayouts(&layouts[0]);
 
         vk::raii::PipelineLayout pipelineLayout = vk::raii::PipelineLayout(_device, pipelineLayoutCreateInfo);
 

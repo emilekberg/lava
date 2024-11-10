@@ -12,6 +12,10 @@ namespace lava
         glfwSetWindowUserPointer(_window->getGLFWwindow(), this);
         _window->setResizeHandler(handleWindowResize);
         _window->activate();
+        _meshes = 
+        {
+            rendering::data::Mesh()
+        };
     }
     App::~App()
     {
@@ -47,12 +51,20 @@ namespace lava
                 _vulkanRenderer.resize(screenSize);
             }
             _window->pollEvents();
-            requiresResize = _vulkanRenderer.render();
+            requiresResize = render();
         }
         _vulkanRenderer.waitUntilIdle();
     }
 
     void App::update()
     {
+    }
+
+    bool App::render()
+    {
+        bool requiresResize = false;
+        
+        requiresResize = _vulkanRenderer.render();
+        return requiresResize;
     }
 }

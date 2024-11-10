@@ -1,7 +1,5 @@
 #include "lava/rendering/vulkan-renderer.hpp"
 #include "lava/rendering/builders/graphics-pipeline-builder.hpp"
-#include "lava/rendering/shader.hpp"
-#include "lava/rendering/attribute-description-builder.hpp"
 #include "lava/rendering/constructors/instance.hpp"
 #include "lava/rendering/constructors/debug-messenger.hpp"
 #include "lava/rendering/constructors/surface.hpp"
@@ -14,14 +12,15 @@
 #include "lava/rendering/constructors/commandpool.hpp"
 #include "lava/rendering/constructors/buffer.hpp"
 #include "lava/core/window.hpp"
-
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <chrono>
 #define UNHANDLED_PARAMETER(param) param;
 #undef max
 namespace lava::rendering
 {
-    VulkanRenderer::VulkanRenderer(const ScreenSize& screenSize, HWND windowHandle) :
-        _validationLayers({"VK_LAYER_KHRONOS_validation"}),
-        _deviceExtensions({VK_KHR_SWAPCHAIN_EXTENSION_NAME})
+    VulkanRenderer::VulkanRenderer(const ScreenSize &screenSize, HWND windowHandle) : _validationLayers({"VK_LAYER_KHRONOS_validation"}),
+                                                                                      _deviceExtensions({VK_KHR_SWAPCHAIN_EXTENSION_NAME})
     {
         _vulkanInstance = constructors::createInstance(_validationLayers);
         _debugMessenger = constructors::createDebugMessenger(*_vulkanInstance.get());
@@ -34,19 +33,23 @@ namespace lava::rendering
         _swapchainImages = _swapchain->getImages();
         _swapchainImageViews = constructors::createImageViews(*_device.get(), _swapchainImages, _swapchainImageFormat);
         _renderpass = constructors::createRenderPass(*_device.get(), _swapchainImageFormat);
+        createDescriptorSetLayout();
         _graphicsPipeline = builders::GraphicsPipelineBuilder(*_device.get())
                                 .withFragmentShader("./build/shaders/shader_frag.spv")
                                 .withVertexShader("./build/shaders/shader_vert.spv")
-                                .withVertexInputInfo(Vertex::getBindingDescription(), Vertex::getAttributeDescriptions())
+                                .withVertexInputInfo(data::Vertex::getBindingDescription(), data::Vertex::getAttributeDescriptions())
                                 .withExtent(_swapchainExtent)
                                 .withRenderPass(_renderpass)
-                                .build();
+                                .build(*_descriptorSetLayout.get());
         _swapchainFrameBuffers = constructors::createFrameBuffers(*_device.get(), *_renderpass.get(), _swapchainExtent, _swapchainImageViews);
         _commandPool = constructors::createCommandPool(*_device.get(), *_physicalDevice.get(), *_surface.get());
         _shortlivedCommandPool = constructors::createTransientCommandPool(*_device.get(), *_physicalDevice.get(), *_surface.get());
 
         createVertexBuffers();
         createIndexBuffers();
+        createUniformBuffers();
+        createDescriptorPool();
+        createDescriptorSets();
         createCommandBuffer();
         createSyncObjects();
     }
@@ -54,6 +57,10 @@ namespace lava::rendering
     VulkanRenderer::~VulkanRenderer()
     {
         cleanupSwapChain();
+        _uniformBuffers.clear();
+        _uniformBufferMemories.clear();
+        _descriptorSets = nullptr;
+        _descriptorPool = nullptr;
         _vertexBuffer = nullptr;
         _vertexBufferMemory = nullptr;
         _indexBuffer = nullptr;
@@ -63,6 +70,7 @@ namespace lava::rendering
         _commandPool = nullptr;
         _shortlivedCommandPool = nullptr;
         _graphicsPipeline = nullptr;
+        _descriptorSetLayout = nullptr;
         _renderpass = nullptr;
 
         _renderFinishedSemaphore.clear();
@@ -100,7 +108,7 @@ namespace lava::rendering
         _swapchainFrameBuffers = constructors::createFrameBuffers(*_device.get(), *_renderpass.get(), _swapchainExtent, _swapchainImageViews);
     }
 
-    void VulkanRenderer::copyBuffer(const vk::raii::Buffer& sourceBuffer, const vk::raii::Buffer& destinationBuffer, vk::DeviceSize size)
+    void VulkanRenderer::copyBuffer(const vk::raii::Buffer &sourceBuffer, const vk::raii::Buffer &destinationBuffer, vk::DeviceSize size)
     {
         vk::CommandBufferAllocateInfo allocInfo{};
         allocInfo.setLevel(vk::CommandBufferLevel::ePrimary)
@@ -128,12 +136,10 @@ namespace lava::rendering
         submitInfo
             .setCommandBufferCount(1)
             .setCommandBuffers(tmpCommandBuffers);
-        
+
         _graphicsQueue->submit(submitInfo, VK_NULL_HANDLE);
         _graphicsQueue->waitIdle();
-        
     }
-
 
     void VulkanRenderer::createVertexBuffers()
     {
@@ -141,13 +147,13 @@ namespace lava::rendering
         std::unique_ptr<vk::raii::Buffer> stagingBuffer;
         std::unique_ptr<vk::raii::DeviceMemory> stagingBufferMemory;
 
-        std::tie(stagingBuffer, stagingBufferMemory) = lava::rendering::constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-        
+        std::tie(stagingBuffer, stagingBufferMemory) = constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+
         void *data = stagingBufferMemory->mapMemory(0, bufferSize);
         memcpy(data, _mesh.vertices.data(), (size_t)bufferSize);
         stagingBufferMemory->unmapMemory();
 
-        std::tie(_vertexBuffer, _vertexBufferMemory) = lava::rendering::constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
+        std::tie(_vertexBuffer, _vertexBufferMemory) = constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
         copyBuffer(*stagingBuffer.get(), *_vertexBuffer.get(), bufferSize);
     }
 
@@ -157,14 +163,81 @@ namespace lava::rendering
         std::unique_ptr<vk::raii::Buffer> stagingBuffer;
         std::unique_ptr<vk::raii::DeviceMemory> stagingBufferMemory;
 
-        std::tie(stagingBuffer, stagingBufferMemory) = lava::rendering::constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-        
+        std::tie(stagingBuffer, stagingBufferMemory) = constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+
         void *data = stagingBufferMemory->mapMemory(0, bufferSize);
         memcpy(data, _mesh.indices.data(), (size_t)bufferSize);
         stagingBufferMemory->unmapMemory();
 
-        std::tie(_indexBuffer, _indexBufferMemory) = lava::rendering::constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
+        std::tie(_indexBuffer, _indexBufferMemory) = constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
         copyBuffer(*stagingBuffer.get(), *_indexBuffer.get(), bufferSize);
+    }
+
+    void VulkanRenderer::createUniformBuffers()
+    {
+        vk::DeviceSize bufferSize = sizeof(data::UniformBufferObject);
+        _uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        _uniformBufferMemories.resize(MAX_FRAMES_IN_FLIGHT);
+        _uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            std::tie(_uniformBuffers[i], _uniformBufferMemories[i]) = constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+            _uniformBuffersMapped[i] = _uniformBufferMemories[i]->mapMemory(0, bufferSize);
+        }
+    }
+
+    void VulkanRenderer::createDescriptorPool()
+    {
+        vk::DescriptorPoolSize poolSize{};
+        poolSize.setDescriptorCount(static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT));
+
+        vk::DescriptorPoolCreateInfo poolInfo{};
+        poolInfo
+            .setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
+            .setPoolSizeCount(1)
+            .setPoolSizes(poolSize)
+            .setMaxSets(static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT));
+
+        _descriptorPool = std::make_unique<vk::raii::DescriptorPool>(*_device.get(), poolInfo);
+    }
+
+    void VulkanRenderer::createDescriptorSets()
+    {
+        std::vector<vk::DescriptorSetLayout> layouts;
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            layouts.push_back(*_descriptorSetLayout.get());
+        }
+        vk::DescriptorSetAllocateInfo allocInfo{};
+        allocInfo
+            .setDescriptorPool(*_descriptorPool.get())
+            .setDescriptorSetCount(MAX_FRAMES_IN_FLIGHT)
+            .setPSetLayouts(layouts.data());
+
+        _descriptorSets = std::make_unique<vk::raii::DescriptorSets>(*_device.get(), allocInfo);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            vk::DescriptorBufferInfo bufferInfo{};
+            bufferInfo
+                .setBuffer(*_uniformBuffers[i].get())
+                .setOffset(0)
+                .setRange(sizeof(data::UniformBufferObject));
+
+            vk::WriteDescriptorSet descriptorWrite{};
+            descriptorWrite
+                .setDstSet(_descriptorSets->at(i))
+                .setDstBinding(0)
+                .setDstArrayElement(0)
+                .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+                .setDescriptorCount(1)
+                .setPBufferInfo(&bufferInfo)
+                .setPImageInfo(nullptr)
+                .setPTexelBufferView(nullptr);
+
+            _device->updateDescriptorSets(descriptorWrite, 0);
+        }
     }
 
     void VulkanRenderer::createCommandBuffer()
@@ -189,6 +262,23 @@ namespace lava::rendering
             _renderFinishedSemaphore.push_back(vk::raii::Semaphore(*_device.get(), semaphoreInfo));
             _inFlightFence.push_back(vk::raii::Fence(*_device.get(), fenceInfo));
         }
+    }
+    void VulkanRenderer::createDescriptorSetLayout()
+    {
+        vk::DescriptorSetLayoutBinding uboLayoutBinding{};
+        uboLayoutBinding
+            .setBinding(0)
+            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+            .setDescriptorCount(1)
+            .setStageFlags(vk::ShaderStageFlagBits::eVertex)
+            .setPImmutableSamplers(nullptr);
+
+        vk::DescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo
+            .setBindingCount(1)
+            .setPBindings(&uboLayoutBinding);
+
+        _descriptorSetLayout = std::make_unique<vk::raii::DescriptorSetLayout>(*_device.get(), layoutInfo);
     }
 
     void VulkanRenderer::requireResize()
@@ -233,6 +323,8 @@ namespace lava::rendering
         _commandBuffers->at(_currentFrame).reset();
 
         recordCommandBuffer(_commandBuffers->at(_currentFrame), imageIndex);
+
+        updateUniformBuffer(_currentFrame);
 
         vk::SubmitInfo submitInfo = {};
 
@@ -298,54 +390,68 @@ namespace lava::rendering
         // beginInfo.setPInheritanceInfo(nullptr);
 
         commandBuffer.begin(beginInfo);
-
         vk::RenderPassBeginInfo renderPassBeginInfo{};
-        renderPassBeginInfo.setRenderPass(*_renderpass.get());
-        renderPassBeginInfo.setFramebuffer(_swapchainFrameBuffers[imageIndex]);
-        renderPassBeginInfo.setRenderArea({0, 0});
-        renderPassBeginInfo.renderArea.setExtent(_swapchainExtent);
+        renderPassBeginInfo
+            .setRenderPass(*_renderpass.get())
+            .setFramebuffer(_swapchainFrameBuffers[imageIndex])
+            .setRenderArea({0, 0})
+            .renderArea.setExtent(_swapchainExtent);
 
         vk::ClearValue clearColor = {{0.0f, 0.0f, 0.0f, 1.0f}};
         renderPassBeginInfo.setClearValueCount(1);
         renderPassBeginInfo.setPClearValues(&clearColor);
 
         commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+        {
+            commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, _graphicsPipeline->getVkPipeline());
 
-        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, _graphicsPipeline->getVkPipeline());
+            vk::Viewport viewport{};
+            viewport
+                .setX(0.0f)
+                .setY(0.0f)
+                .setWidth(static_cast<float>(_swapchainExtent.width))
+                .setHeight(static_cast<float>(_swapchainExtent.height))
+                .setMinDepth(0.0f)
+                .setMaxDepth(0.0f);
+            commandBuffer.setViewport(0, viewport);
 
-        vk::Viewport viewport{};
-        viewport.setX(0.0f);
-        viewport.setY(0.0f);
-        viewport.setWidth(static_cast<float>(_swapchainExtent.width));
-        viewport.setHeight(static_cast<float>(_swapchainExtent.height));
-        viewport.setMinDepth(0.0f);
-        viewport.setMaxDepth(0.0f);
-        commandBuffer.setViewport(0, viewport);
+            vk::Rect2D scissor{};
+            scissor.setOffset({0, 0})
+                .setExtent(_swapchainExtent);
+            commandBuffer.setScissor(0, scissor);
 
-        vk::Rect2D scissor{};
-        scissor.setOffset({0, 0});
-        scissor.setExtent(_swapchainExtent);
-        commandBuffer.setScissor(0, scissor);
-
-        vk::Buffer vertexBuffers[] = {*_vertexBuffer.get()};
-        vk::Buffer indexBuffers[] = {*_indexBuffer.get()};
-        vk::DeviceSize offsets[] = {0};
-        commandBuffer.bindVertexBuffers(0, vertexBuffers, offsets);
-        commandBuffer.bindIndexBuffer(*_indexBuffer.get(), {0}, vk::IndexType::eUint32);
-
-        commandBuffer.drawIndexed(static_cast<uint32_t>(_mesh.indices.size()), 1, 0, 0, 0);
-        // commandBuffer.draw(static_cast<uint32_t>(_mesh.vertices.size()), 1, 0, 0);
-        // commandBuffer.draw(3, 1, 0, 0);
-
+            vk::Buffer vertexBuffers[] = {*_vertexBuffer.get()};
+            vk::DeviceSize offsets[] = {0};
+            commandBuffer.bindVertexBuffers(0, vertexBuffers, offsets);
+            commandBuffer.bindIndexBuffer(*_indexBuffer.get(), {0}, vk::IndexType::eUint32);
+            
+            commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, _graphicsPipeline->getVkPipelineLayout(), 0, {_descriptorSets->at(_currentFrame)}, nullptr);
+            commandBuffer.drawIndexed(static_cast<uint32_t>(_mesh.indices.size()), 1, 0, 0, 0);
+        }
         commandBuffer.endRenderPass();
         commandBuffer.end();
+    }
+
+    void VulkanRenderer::updateUniformBuffer(uint32_t currentImage)
+    {
+        static auto startTime = std::chrono::high_resolution_clock::now();
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+        data::UniformBufferObject ubo{};
+        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.projection = glm::perspective(45.0f, _swapchainExtent.width / (float)_swapchainExtent.height, 0.1f, 10.0f);
+        ubo.projection[1][1] *= -1;
+
+        memcpy(_uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
     void VulkanRenderer::waitUntilIdle()
     {
         _device->waitIdle();
     }
-    void VulkanRenderer::resize(const ScreenSize& screenSize)
+    void VulkanRenderer::resize(const ScreenSize &screenSize)
     {
         recreateSwapChain(screenSize);
     }

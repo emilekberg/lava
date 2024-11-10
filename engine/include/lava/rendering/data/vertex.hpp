@@ -2,11 +2,11 @@
 #include <array>
 #include <glm/glm.hpp>
 #include <vulkan/vulkan_raii.hpp>
-namespace lava::rendering
+namespace lava::rendering::data
 {
     struct Vertex
     {
-        glm::vec2 pos;
+        glm::vec3 pos;
         glm::vec3 color;
 
         static vk::VertexInputBindingDescription getBindingDescription()
@@ -20,11 +20,10 @@ namespace lava::rendering
 
         static std::vector<vk::VertexInputAttributeDescription> getAttributeDescriptions()
         {
-            std::vector<vk::VertexInputAttributeDescription> attributeDescriptions{};
-            attributeDescriptions.resize(2);
+            std::vector<vk::VertexInputAttributeDescription> attributeDescriptions(2);
             attributeDescriptions[0].setBinding(0);
             attributeDescriptions[0].setLocation(0);
-            attributeDescriptions[0].setFormat(vk::Format::eR32G32Sfloat);
+            attributeDescriptions[0].setFormat(vk::Format::eR32G32B32Sfloat);
             attributeDescriptions[0].setOffset(offsetof(Vertex, pos));
 
             attributeDescriptions[1].setBinding(0);
