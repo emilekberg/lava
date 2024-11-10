@@ -49,7 +49,7 @@ namespace lava::rendering::constructors
         return true;
     }
  
-    std::unique_ptr<vk::raii::Instance> createInstance(std::vector<const char *> validationLayers)
+    vk::raii::Instance createInstance(std::vector<const char *> validationLayers)
     {
         if (!validationLayers.empty() && !checkValidationLayerSupport(validationLayers))
         {
@@ -80,12 +80,7 @@ namespace lava::rendering::constructors
         createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
         createInfo.ppEnabledLayerNames = validationLayers.data();
 
-        auto instance = std::make_unique<vk::raii::Instance>(context, createInfo);
-        if (instance == nullptr)
-        {
-            throw std::runtime_error("failed to create vulkan instance");
-        }
-
+        auto instance = vk::raii::Instance(context, createInfo);
         return std::move(instance);
     }
 

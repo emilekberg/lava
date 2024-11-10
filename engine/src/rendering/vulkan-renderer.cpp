@@ -19,15 +19,15 @@
 #undef max
 namespace lava::rendering
 {
-    VulkanRenderer::VulkanRenderer(const ScreenSize &screenSize, HWND windowHandle) : _validationLayers({"VK_LAYER_KHRONOS_validation"}),
-                                                                                      _deviceExtensions({VK_KHR_SWAPCHAIN_EXTENSION_NAME})
+    VulkanRenderer::VulkanRenderer(const ScreenSize &screenSize, HWND windowHandle) :  _validationLayers({"VK_LAYER_KHRONOS_validation"}),
+                                                                                      _deviceExtensions({VK_KHR_SWAPCHAIN_EXTENSION_NAME}),
+                                                                                      _vulkanInstance(VK_NULL_HANDLE)
     {
         _vulkanInstance = constructors::createInstance(_validationLayers);
-        _debugMessenger = constructors::createDebugMessenger(*_vulkanInstance.get());
-        _surface = constructors::createSurface(*_vulkanInstance.get(), windowHandle);
-        _physicalDevice = constructors::pickPhysicalDevice(*_vulkanInstance.get(), *_surface.get(), _deviceExtensions);
-
-        std::tie(_device, _presentQueue, _graphicsQueue) = constructors::createDevice(*_vulkanInstance.get(), *_physicalDevice.get(), *_surface.get(), _deviceExtensions, _validationLayers);
+        _debugMessenger = constructors::createDebugMessenger(_vulkanInstance);
+        _surface = constructors::createSurface(_vulkanInstance, windowHandle);
+        _physicalDevice = constructors::pickPhysicalDevice(_vulkanInstance, *_surface.get(), _deviceExtensions);
+        std::tie(_device, _presentQueue, _graphicsQueue) = constructors::createDevice(_vulkanInstance, *_physicalDevice.get(), *_surface.get(), _deviceExtensions, _validationLayers);
 
         std::tie(_swapchain, _swapchainImageFormat, _swapchainExtent) = constructors::createSwapChain(*_device.get(), *_physicalDevice.get(), *_surface.get(), screenSize);
         _swapchainImages = _swapchain->getImages();
@@ -56,36 +56,7 @@ namespace lava::rendering
 
     VulkanRenderer::~VulkanRenderer()
     {
-        cleanupSwapChain();
-        _uniformBuffers.clear();
-        _uniformBufferMemories.clear();
-        _descriptorSets = nullptr;
-        _descriptorPool = nullptr;
-        _vertexBuffer = nullptr;
-        _vertexBufferMemory = nullptr;
-        _indexBuffer = nullptr;
-        _indexBufferMemory = nullptr;
-        _inFlightFence.clear();
-        _commandBuffers->clear();
-        _commandPool = nullptr;
-        _shortlivedCommandPool = nullptr;
-        _graphicsPipeline = nullptr;
-        _descriptorSetLayout = nullptr;
-        _renderpass = nullptr;
-
-        _renderFinishedSemaphore.clear();
-        _imageAvailableSemaphore.clear();
-
-        _swapchainImages.clear();
-        _swapchain = nullptr;
-        _presentQueue = nullptr;
-        _graphicsQueue = nullptr;
-        _device = nullptr;
-        _physicalDevice = nullptr;
-        // _window = nullptr;
-        _debugMessenger = nullptr;
-        _surface = nullptr;
-        _vulkanInstance = nullptr;
+        //cleanupSwapChain();
     }
 
     void VulkanRenderer::cleanupSwapChain()
