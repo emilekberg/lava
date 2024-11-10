@@ -154,10 +154,17 @@ namespace lava::rendering
     void VulkanRenderer::createIndexBuffers()
     {
         vk::DeviceSize bufferSize = sizeof(_mesh.indices[0]) * _mesh.indices.size();
-        std::tie(_indexBuffer, _indexBufferMemory) = lava::rendering::constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-        void *data = _indexBufferMemory->mapMemory(0, bufferSize);
+        std::unique_ptr<vk::raii::Buffer> stagingBuffer;
+        std::unique_ptr<vk::raii::DeviceMemory> stagingBufferMemory;
+
+        std::tie(stagingBuffer, stagingBufferMemory) = lava::rendering::constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        
+        void *data = stagingBufferMemory->mapMemory(0, bufferSize);
         memcpy(data, _mesh.indices.data(), (size_t)bufferSize);
-        _indexBufferMemory->unmapMemory();
+        stagingBufferMemory->unmapMemory();
+
+        std::tie(_indexBuffer, _indexBufferMemory) = lava::rendering::constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
+        copyBuffer(*stagingBuffer.get(), *_indexBuffer.get(), bufferSize);
     }
 
     void VulkanRenderer::createCommandBuffer()
