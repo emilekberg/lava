@@ -1,8 +1,13 @@
 #include <cstdio>
 #include <lava/app.hpp>
 #include <GLFW/glfw3.h>
+#include "lava/resourceloader.hpp"
 int main()
 {
+    
+
+
+
     try
     {
         glfwInit();

@@ -38,19 +38,32 @@ message(STATUS "include vulkan")
 find_package(Vulkan REQUIRED)
 add_compile_definitions(GLFW_INCLUDE_VULKAN)
 
+# --
+# Include imgui
+# --
+# message(STATUS "include imgui")
+# FetchContent_Declare(imgui
+#     GIT_REPOSITORY https://github.com/ocornut/imgui.git
+# )
+# FetchContent_MakeAvailable(imgui)
+# FetchContent_GetProperties(imgui)
+
 
 target_include_directories(lava_engine
     PUBLIC
     glm::glm
     glfw
     Vulkan::Vulkan
+    imgui
     ${PROJECT_SOURCE_DIR}/include
 )
+
 target_link_libraries(lava_engine
     PUBLIC
     glm::glm
     glfw
     Vulkan::Vulkan
+    # imgui
 )
 target_compile_definitions(lava_engine PUBLIC GLFW_INCLUDE_VULKAN=${GLFW_INCLUDE_VULKAN})
 target_compile_definitions(lava_engine PUBLIC VK_USE_PLATFORM_WIN32_KHR=${VK_USE_PLATFORM_WIN32_KHR})

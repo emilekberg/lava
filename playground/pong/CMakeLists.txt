@@ -11,8 +11,5 @@ target_compile_definitions(pong PUBLIC GLFW_EXPOSE_NATIVE_WIN32=${GLFW_EXPOSE_NA
 
 target_link_libraries(pong
     PUBLIC
-#    glm::glm
-#    glfw
-#    Vulkan::Vulkan
     lava_engine
 )

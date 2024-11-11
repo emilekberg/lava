@@ -1,5 +1,5 @@
 #pragma once
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_raii.hpp>
 #include <vector>
 namespace lava::rendering
 {
@@ -13,12 +13,6 @@ namespace lava::rendering
             return !formats.empty() && !presentModes.empty();
         }
     };
-    SwapChainSupportDetails querySwapChainSupport(const vk::raii::PhysicalDevice &physicalDevice, const vk::raii::SurfaceKHR &surface)
-    {
-        SwapChainSupportDetails details;
-        details.capabilities = physicalDevice.getSurfaceCapabilitiesKHR(surface);
-        details.formats = physicalDevice.getSurfaceFormatsKHR(surface);
-        details.presentModes = physicalDevice.getSurfacePresentModesKHR(surface);
-        return details;
-    }
+    SwapChainSupportDetails querySwapChainSupport(const vk::raii::PhysicalDevice &physicalDevice, const vk::raii::SurfaceKHR &surface);
+ 
 }

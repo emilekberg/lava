@@ -3,7 +3,7 @@
 namespace lava::rendering::builders
 {
     GraphicsPipelineBuilder::GraphicsPipelineBuilder(const vk::raii::Device &device)
-        : _device(device)
+        : _device(device) 
     {
     }
 
@@ -61,13 +61,12 @@ namespace lava::rendering::builders
         return *this;
     }
 
-    GraphicsPipelineBuilder& GraphicsPipelineBuilder::withRenderPass(std::shared_ptr<vk::raii::RenderPass> renderPass)
+    GraphicsPipelineBuilder& GraphicsPipelineBuilder::withRenderPass(const vk::raii::RenderPass& renderPass)
     {
-        _renderPass = renderPass;
         return *this;
     }
 
-    std::unique_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build(const vk::raii::DescriptorSetLayout& layout)
+    std::unique_ptr<GraphicsPipeline> GraphicsPipelineBuilder::build(const vk::raii::DescriptorSetLayout& layout, const vk::raii::RenderPass& renderpass)
     {
         vk::PipelineShaderStageCreateInfo shaderStages[] = {_vertexCreateInfo.value(), _fragmentCreateInfo.value()};
         std::vector<vk::DynamicState> dynamicStates = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
@@ -157,7 +156,7 @@ namespace lava::rendering::builders
         pipelineInfo.setPDynamicState(&dynamicState);
 
         pipelineInfo.setLayout(pipelineLayout);
-        pipelineInfo.setRenderPass(*_renderPass.get());
+        pipelineInfo.setRenderPass(renderpass);
 
         pipelineInfo.setSubpass(0);
 

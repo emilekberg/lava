@@ -10,6 +10,7 @@
 #include "lava/rendering/screensize.hpp"
 #include "lava/core/window.hpp"
 #include "lava/rendering/data/uniform-buffer-object.hpp"
+#include "lava/rendering/renderpass.hpp"
 #include "lava/rendering/render-context.hpp"
 namespace lava::rendering
 {
@@ -47,13 +48,15 @@ namespace lava::rendering
         std::unique_ptr<vk::raii::DebugUtilsMessengerEXT> _debugMessenger;
         std::unique_ptr<vk::raii::PhysicalDevice> _physicalDevice;
         std::unique_ptr<vk::raii::Device> _device;
+        std::unique_ptr<RenderContext> _renderContext;
+        std::unique_ptr<RenderPass> _renderpass;
         std::unique_ptr<vk::raii::Queue> _presentQueue;
         std::unique_ptr<vk::raii::Queue> _graphicsQueue;
         
         std::vector<vk::raii::Semaphore> _imageAvailableSemaphore;
         std::vector<vk::raii::Semaphore> _renderFinishedSemaphore;
         
-        std::shared_ptr<vk::raii::RenderPass> _renderpass;
+        // std::shared_ptr<vk::raii::RenderPass> _renderpass;
         std::unique_ptr<vk::raii::DescriptorSetLayout> _descriptorSetLayout;
         std::unique_ptr<rendering::GraphicsPipeline> _graphicsPipeline;
         
@@ -78,13 +81,13 @@ namespace lava::rendering
         std::vector<const char *> _validationLayers;
         std::vector<const char *> _deviceExtensions;
 
-        vk::Format _swapchainImageFormat;
-        vk::Extent2D _swapchainExtent;
+        // vk::Format _swapchainImageFormat;
+        // vk::Extent2D _swapchainExtent;
 
-        std::unique_ptr<vk::raii::SwapchainKHR> _swapchain;
-        std::vector<vk::Image> _swapchainImages;
-        std::vector<vk::raii::ImageView> _swapchainImageViews;
-        std::vector<vk::raii::Framebuffer> _swapchainFrameBuffers;
+        //std::unique_ptr<vk::raii::SwapchainKHR> _swapchain;
+        //std::vector<vk::Image> _swapchainImages;
+        //std::vector<vk::raii::ImageView> _swapchainImageViews;
+        //std::vector<vk::raii::Framebuffer> _swapchainFrameBuffers;
     
         bool _requiresResize = false;
         uint32_t _currentFrame = 0;

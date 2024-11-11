@@ -1,6 +1,6 @@
 #include "lava/app.hpp"
 #include <set>
-
+// #include <imgui.h>
 #define UNHANDLED_PARAMETER(param) param;
 #undef max
 namespace lava
@@ -16,6 +16,7 @@ namespace lava
         {
             rendering::data::Mesh()
         };
+
     }
     App::~App()
     {
@@ -63,7 +64,7 @@ namespace lava
     bool App::render()
     {
         bool requiresResize = false;
-        
+
         requiresResize = _vulkanRenderer.render();
         return requiresResize;
     }

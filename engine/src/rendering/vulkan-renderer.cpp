@@ -7,7 +7,7 @@
 #include "lava/rendering/constructors/device.hpp"
 #include "lava/rendering/constructors/swapchain.hpp"
 #include "lava/rendering/constructors/image-views.hpp"
-#include "lava/rendering/constructors/renderpass.hpp"
+// #include "lava/rendering/constructors/_renderpass.hpp"
 #include "lava/rendering/constructors/framebuffers.hpp"
 #include "lava/rendering/constructors/commandpool.hpp"
 #include "lava/rendering/constructors/buffer.hpp"
@@ -15,6 +15,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
+#include "lava/resourceloader.hpp"
 #define UNHANDLED_PARAMETER(param) param;
 #undef max
 namespace lava::rendering
@@ -23,25 +24,23 @@ namespace lava::rendering
                                                                                       _deviceExtensions({VK_KHR_SWAPCHAIN_EXTENSION_NAME}),
                                                                                       _vulkanInstance(VK_NULL_HANDLE)
     {
+        _mesh = lava::resourceloader::loadMesh("./build/mesh/viking_room.obj");
         _vulkanInstance = constructors::createInstance(_validationLayers);
         _debugMessenger = constructors::createDebugMessenger(_vulkanInstance);
         _surface = constructors::createSurface(_vulkanInstance, windowHandle);
         _physicalDevice = constructors::pickPhysicalDevice(_vulkanInstance, *_surface.get(), _deviceExtensions);
         std::tie(_device, _presentQueue, _graphicsQueue) = constructors::createDevice(_vulkanInstance, *_physicalDevice.get(), *_surface.get(), _deviceExtensions, _validationLayers);
 
-        std::tie(_swapchain, _swapchainImageFormat, _swapchainExtent) = constructors::createSwapChain(*_device.get(), *_physicalDevice.get(), *_surface.get(), screenSize);
-        _swapchainImages = _swapchain->getImages();
-        _swapchainImageViews = constructors::createImageViews(*_device.get(), _swapchainImages, _swapchainImageFormat);
-        _renderpass = constructors::createRenderPass(*_device.get(), _swapchainImageFormat);
+        _renderContext = std::make_unique<RenderContext>(*_device.get(), *_surface.get(), *_physicalDevice.get(), screenSize);
+        _renderpass = std::make_unique<RenderPass>(*_device.get(), *_physicalDevice.get(), *_renderContext.get());
         createDescriptorSetLayout();
         _graphicsPipeline = builders::GraphicsPipelineBuilder(*_device.get())
                                 .withFragmentShader("./build/shaders/shader_frag.spv")
                                 .withVertexShader("./build/shaders/shader_vert.spv")
                                 .withVertexInputInfo(data::Vertex::getBindingDescription(), data::Vertex::getAttributeDescriptions())
-                                .withExtent(_swapchainExtent)
-                                .withRenderPass(_renderpass)
-                                .build(*_descriptorSetLayout.get());
-        _swapchainFrameBuffers = constructors::createFrameBuffers(*_device.get(), *_renderpass.get(), _swapchainExtent, _swapchainImageViews);
+                                .withExtent(_renderContext->getExtent())
+                                // .withRenderPass(_renderContext->getRenderpass())
+                                .build(*_descriptorSetLayout.get(), _renderpass->getRenderpass());
         _commandPool = constructors::createCommandPool(*_device.get(), *_physicalDevice.get(), *_surface.get());
         _shortlivedCommandPool = constructors::createTransientCommandPool(*_device.get(), *_physicalDevice.get(), *_surface.get());
 
@@ -52,6 +51,7 @@ namespace lava::rendering
         createDescriptorSets();
         createCommandBuffer();
         createSyncObjects();
+
     }
 
     VulkanRenderer::~VulkanRenderer()
@@ -61,22 +61,15 @@ namespace lava::rendering
 
     void VulkanRenderer::cleanupSwapChain()
     {
-        _swapchainFrameBuffers.clear();
-        _swapchainImageViews.clear();
-        _swapchain = nullptr;
+        //_swapchainFrameBuffers.clear();
+        //_swapchainImageViews.clear();
+        //_swapchain = nullptr;
     }
     void VulkanRenderer::recreateSwapChain(const ScreenSize &screenSize)
     {
         _device->waitIdle();
+        _renderContext->resize(screenSize);
         cleanupSwapChain();
-        std::unique_ptr<vk::raii::SwapchainKHR> newSwapchain;
-        std::tie(newSwapchain, _swapchainImageFormat, _swapchainExtent) = constructors::createSwapChain(*_device.get(), *_physicalDevice.get(), *_surface.get(), screenSize);
-
-        _swapchain = std::move(newSwapchain);
-        _swapchainImages = _swapchain->getImages();
-
-        _swapchainImageViews = constructors::createImageViews(*_device.get(), _swapchainImages, _swapchainImageFormat);
-        _swapchainFrameBuffers = constructors::createFrameBuffers(*_device.get(), *_renderpass.get(), _swapchainExtent, _swapchainImageViews);
     }
 
     void VulkanRenderer::copyBuffer(const vk::raii::Buffer &sourceBuffer, const vk::raii::Buffer &destinationBuffer, vk::DeviceSize size)
@@ -267,7 +260,7 @@ namespace lava::rendering
         try
 #endif
         {
-            std::tie(result, imageIndex) = _swapchain->acquireNextImage(UINT64_MAX, *_imageAvailableSemaphore[_currentFrame]);
+            std::tie(result, imageIndex) = _renderContext->getSwapchain().acquireNextImage(UINT64_MAX, *_imageAvailableSemaphore[_currentFrame]);
             if (result == vk::Result::eErrorOutOfDateKHR)
             {
                 _requiresResize = true;
@@ -286,14 +279,13 @@ namespace lava::rendering
 #endif
         if (_requiresResize)
         {
-            _requiresResize = false;
             return true;
         }
         _device->resetFences({*_inFlightFence[_currentFrame]});
+        const vk::raii::CommandBuffer& commandBuffer = _commandBuffers->at(_currentFrame);
+        commandBuffer.reset();
 
-        _commandBuffers->at(_currentFrame).reset();
-
-        recordCommandBuffer(_commandBuffers->at(_currentFrame), imageIndex);
+        recordCommandBuffer(commandBuffer, imageIndex);
 
         updateUniformBuffer(_currentFrame);
 
@@ -305,7 +297,7 @@ namespace lava::rendering
         submitInfo.setPWaitSemaphores(waitSemaphore);
         submitInfo.setPWaitDstStageMask(waitStages);
 
-        vk::CommandBuffer commandBuffers[] = {_commandBuffers->at(_currentFrame)};
+        vk::CommandBuffer commandBuffers[] = {commandBuffer};
         submitInfo.setCommandBufferCount(1);
         submitInfo.setCommandBuffers(commandBuffers);
 
@@ -319,7 +311,7 @@ namespace lava::rendering
         presentInfo.setWaitSemaphoreCount(1);
         presentInfo.setPWaitSemaphores(signalSemaphores);
 
-        vk::SwapchainKHR swapChains[] = {*_swapchain.get()};
+        vk::SwapchainKHR swapChains[] = {_renderContext->getSwapchain()};
         presentInfo.setSwapchainCount(1);
         presentInfo.setPSwapchains(swapChains);
         presentInfo.setPImageIndices(&imageIndex);
@@ -349,7 +341,6 @@ namespace lava::rendering
         _currentFrame = (_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
         if (_requiresResize)
         {
-            _requiresResize = false;
             return true;
         }
         return false;
@@ -361,18 +352,9 @@ namespace lava::rendering
         // beginInfo.setPInheritanceInfo(nullptr);
 
         commandBuffer.begin(beginInfo);
-        vk::RenderPassBeginInfo renderPassBeginInfo{};
-        renderPassBeginInfo
-            .setRenderPass(*_renderpass.get())
-            .setFramebuffer(_swapchainFrameBuffers[imageIndex])
-            .setRenderArea({0, 0})
-            .renderArea.setExtent(_swapchainExtent);
 
-        vk::ClearValue clearColor = {{0.0f, 0.0f, 0.0f, 1.0f}};
-        renderPassBeginInfo.setClearValueCount(1);
-        renderPassBeginInfo.setPClearValues(&clearColor);
 
-        commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+        _renderpass->begin(commandBuffer, *_renderContext.get(), imageIndex);
         {
             commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, _graphicsPipeline->getVkPipeline());
 
@@ -380,15 +362,15 @@ namespace lava::rendering
             viewport
                 .setX(0.0f)
                 .setY(0.0f)
-                .setWidth(static_cast<float>(_swapchainExtent.width))
-                .setHeight(static_cast<float>(_swapchainExtent.height))
+                .setWidth(static_cast<float>(_renderContext->getExtent().width))
+                .setHeight(static_cast<float>(_renderContext->getExtent().height))
                 .setMinDepth(0.0f)
                 .setMaxDepth(0.0f);
             commandBuffer.setViewport(0, viewport);
 
             vk::Rect2D scissor{};
             scissor.setOffset({0, 0})
-                .setExtent(_swapchainExtent);
+                .setExtent(_renderContext->getExtent());
             commandBuffer.setScissor(0, scissor);
 
             vk::Buffer vertexBuffers[] = {*_vertexBuffer.get()};
@@ -399,7 +381,7 @@ namespace lava::rendering
             commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, _graphicsPipeline->getVkPipelineLayout(), 0, {_descriptorSets->at(_currentFrame)}, nullptr);
             commandBuffer.drawIndexed(static_cast<uint32_t>(_mesh.indices.size()), 1, 0, 0, 0);
         }
-        commandBuffer.endRenderPass();
+        _renderpass->end(commandBuffer);
         commandBuffer.end();
     }
 
@@ -412,7 +394,7 @@ namespace lava::rendering
         data::UniformBufferObject ubo{};
         ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.projection = glm::perspective(45.0f, _swapchainExtent.width / (float)_swapchainExtent.height, 0.1f, 10.0f);
+        ubo.projection = glm::perspective(45.0f, _renderContext->getExtent().width / (float)_renderContext->getExtent().height, 0.1f, 10.0f);
         ubo.projection[1][1] *= -1;
 
         memcpy(_uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
@@ -424,6 +406,8 @@ namespace lava::rendering
     }
     void VulkanRenderer::resize(const ScreenSize &screenSize)
     {
+        _requiresResize = false;
         recreateSwapChain(screenSize);
+        _renderpass->recreateFramebuffers(*_renderContext.get());
     }
 }
