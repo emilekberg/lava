@@ -38,8 +38,16 @@ namespace lava::rendering
         void createCommandBuffer();
         void createSyncObjects();
         void createDescriptorSetLayout();
+        void beginSingleTimeCommands(std::function<void(const vk::raii::CommandBuffer&)> callback);
+        void endSingleTimeCommands(const vk::raii::CommandBuffer& commandBuffer);
+        // void copyBuffer2(const vk::raii::Buffer& sourceBuffer, const vk::raii::Buffer& destinationBuffer, vk::DeviceSize size);
+        void transitionImageLayout(const vk::Image& image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
         void recordCommandBuffer(const vk::raii::CommandBuffer &commandBuffer, uint32_t imageIndex);
+        void copyBufferToImage(const vk::raii::Buffer& buffer, const vk::raii::Image& image, uint32_t width, uint32_t height);
         void updateUniformBuffer(uint32_t currentImage);
+ 
+        std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> createImage(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice, uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties);
+        std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> createTextureImage(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice);
 
         const uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -81,6 +89,10 @@ namespace lava::rendering
         std::vector<const char *> _validationLayers;
         std::vector<const char *> _deviceExtensions;
 
+
+
+        std::unique_ptr<vk::raii::Image> _image;
+        std::unique_ptr<vk::raii::DeviceMemory> _imageMemory;
         // vk::Format _swapchainImageFormat;
         // vk::Extent2D _swapchainExtent;
 

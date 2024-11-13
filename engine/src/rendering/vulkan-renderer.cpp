@@ -1,5 +1,6 @@
 #include "lava/rendering/vulkan-renderer.hpp"
 #include "lava/rendering/builders/graphics-pipeline-builder.hpp"
+#include "lava/rendering/constructors/buffer.hpp"
 #include "lava/rendering/constructors/instance.hpp"
 #include "lava/rendering/constructors/debug-messenger.hpp"
 #include "lava/rendering/constructors/surface.hpp"
@@ -16,11 +17,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 #include "lava/resourceloader.hpp"
+#include "lava/rendering/constructors/texture-image.hpp"
 #define UNHANDLED_PARAMETER(param) param;
 #undef max
 namespace lava::rendering
 {
-    VulkanRenderer::VulkanRenderer(const ScreenSize &screenSize, HWND windowHandle) :  _validationLayers({"VK_LAYER_KHRONOS_validation"}),
+    VulkanRenderer::VulkanRenderer(const ScreenSize &screenSize, HWND windowHandle) : _validationLayers({"VK_LAYER_KHRONOS_validation"}),
                                                                                       _deviceExtensions({VK_KHR_SWAPCHAIN_EXTENSION_NAME}),
                                                                                       _vulkanInstance(VK_NULL_HANDLE)
     {
@@ -52,11 +54,12 @@ namespace lava::rendering
         createCommandBuffer();
         createSyncObjects();
 
+        std::tie(_image, _imageMemory) = createTextureImage(*_device.get(), *_physicalDevice.get());
     }
 
     VulkanRenderer::~VulkanRenderer()
     {
-        //cleanupSwapChain();
+        // cleanupSwapChain();
     }
 
     void VulkanRenderer::cleanupSwapChain()
@@ -250,6 +253,193 @@ namespace lava::rendering
         _requiresResize = true;
     }
 
+    void VulkanRenderer::beginSingleTimeCommands(std::function<void(const vk::raii::CommandBuffer &)> callback)
+    {
+        vk::CommandBufferAllocateInfo allocInfo{};
+        allocInfo.setCommandPool(*_commandPool.get());
+        allocInfo.setLevel(vk::CommandBufferLevel::ePrimary);
+        allocInfo.setCommandBufferCount(MAX_FRAMES_IN_FLIGHT);
+
+        vk::raii::CommandBuffers commandBuffers(*_device.get(), allocInfo);
+
+        vk::raii::CommandBuffer commandBuffer = std::move(commandBuffers[0]);
+
+        vk::CommandBufferBeginInfo beginInfo{};
+        beginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+        commandBuffer.begin(beginInfo);
+        {
+            callback(commandBuffer);
+        }
+
+        commandBuffer.end();
+        vk::CommandBuffer tmpCommandBuffers[] = {commandBuffer};
+        vk::SubmitInfo submitInfo{};
+        submitInfo.setCommandBufferCount(1);
+        submitInfo.setPCommandBuffers(tmpCommandBuffers);
+
+        _graphicsQueue->submit({submitInfo}, VK_NULL_HANDLE);
+        _graphicsQueue->waitIdle();
+        // return std::move(commandBuffer);
+    }
+
+    void VulkanRenderer::endSingleTimeCommands(const vk::raii::CommandBuffer &commandBuffer)
+    {
+        vk::CommandBuffer tmpCommandBuffers[] = {commandBuffer};
+        vk::SubmitInfo submitInfo{};
+        submitInfo.setCommandBufferCount(1);
+        submitInfo.setPCommandBuffers(tmpCommandBuffers);
+
+        _graphicsQueue->submit({submitInfo}, VK_NULL_HANDLE);
+        _graphicsQueue->waitIdle();
+    }
+
+    /*void VulkanRenderer::copyBuffer2(const vk::raii::Buffer &sourceBuffer, const vk::raii::Buffer &destinationBuffer, vk::DeviceSize size)
+    {
+        const vk::raii::CommandBuffer &commandBuffer = beginSingleTimeCommands();
+
+        vk::BufferCopy copyRegion{};
+        copyRegion.size = size;
+        commandBuffer.copyBuffer(sourceBuffer, destinationBuffer, {copyRegion});
+
+        endSingleTimeCommands(std::move(commandBuffer));
+    }*/
+
+    void VulkanRenderer::transitionImageLayout(const vk::Image &image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)
+    {
+        beginSingleTimeCommands([&](const vk::raii::CommandBuffer &commandBuffer)
+                                {
+            vk::ImageMemoryBarrier barrier{};
+            barrier
+                .setOldLayout(oldLayout)
+                .setNewLayout(newLayout)
+                .setSrcQueueFamilyIndex(vk::QueueFamilyIgnored)
+                .setDstQueueFamilyIndex(vk::QueueFamilyIgnored)
+                .setImage(image)
+                .subresourceRange
+                .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                .setBaseMipLevel(0)
+                .setLevelCount(1)
+                .setBaseArrayLayer(0)
+                .setLayerCount(1);
+
+            vk::PipelineStageFlags sourceStage;
+            vk::PipelineStageFlags destinationStage;
+
+            if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eTransferDstOptimal)
+            {
+                barrier.setSrcAccessMask(vk::AccessFlagBits::eNone);
+                barrier.setDstAccessMask(vk::AccessFlagBits::eTransferWrite);
+
+                sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
+                destinationStage = vk::PipelineStageFlagBits::eTransfer;
+            }
+            else if (oldLayout == vk::ImageLayout::eTransferDstOptimal && newLayout == vk::ImageLayout::eShaderReadOnlyOptimal)
+            {
+                barrier.setSrcAccessMask(vk::AccessFlagBits::eTransferWrite);
+                barrier.setDstAccessMask(vk::AccessFlagBits::eShaderRead);
+
+                sourceStage = vk::PipelineStageFlagBits::eTransfer;
+                destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
+            }
+            else
+            {
+                throw new std::invalid_argument("unsupported layout transition!");
+            }
+
+            barrier;
+            //.setSrcAccessMask(0)
+            //.setDstAccessMask(0);
+
+            commandBuffer.pipelineBarrier(
+                sourceStage, destinationStage,
+                vk::Flags<vk::DependencyFlagBits>(),
+                0,
+                0,
+                barrier); });
+    }
+
+    void VulkanRenderer::copyBufferToImage(const vk::raii::Buffer &buffer, const vk::raii::Image &image, uint32_t width, uint32_t height)
+    {
+        beginSingleTimeCommands([&](const vk::raii::CommandBuffer &commandBuffer)
+                                {
+            vk::BufferImageCopy region{};
+            region
+                .setBufferOffset(0)
+                .setBufferRowLength(0)
+                .setBufferImageHeight(0);
+
+            region.imageSubresource
+                .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                .setMipLevel(0)
+                .setBaseArrayLayer(0)
+                .setLayerCount(1);
+
+            region
+                .setImageOffset({0, 0, 0})
+                .setImageExtent({width, height, 1}); });
+    }
+
+    std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> VulkanRenderer::createImage(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice, uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties)
+    {
+        vk::ImageCreateInfo imageInfo{};
+        imageInfo
+            .setImageType(vk::ImageType::e2D)
+            .setExtent({width, height, 1})
+            .setMipLevels(1)
+            .setArrayLayers(1)
+            .setFormat(format)
+            .setTiling(tiling)
+            .setInitialLayout(vk::ImageLayout::eUndefined)
+            .setUsage(usage)
+            .setSharingMode(vk::SharingMode::eExclusive)
+            .setSamples(vk::SampleCountFlagBits::e1);
+
+        std::unique_ptr<vk::raii::Image> textureImage = std::make_unique<vk::raii::Image>(device, imageInfo);
+
+        auto memoryRequirements = textureImage->getMemoryRequirements();
+
+        vk::MemoryAllocateInfo allocInfo{};
+        allocInfo
+            .setAllocationSize(memoryRequirements.size)
+            .setMemoryTypeIndex(constructors::findMemoryType(physicalDevice, memoryRequirements.memoryTypeBits, properties));
+
+        std::unique_ptr<vk::raii::DeviceMemory> textureMemory = std::make_unique<vk::raii::DeviceMemory>(std::move(device.allocateMemory(allocInfo)));
+        textureImage->bindMemory(*textureMemory.get(), 0);
+
+        return std::make_tuple(std::move(textureImage), std::move(textureMemory));
+    }
+    std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> VulkanRenderer::createTextureImage(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice)
+    {
+        int textureWidth, textureHeight, textureChannels;
+        stbi_uc *pixels = stbi_load("./build/mesh/viking_room.png", &textureWidth, &textureHeight, &textureChannels, STBI_rgb_alpha);
+
+        vk::DeviceSize imageSize = textureWidth * textureHeight * 4;
+
+        if (!pixels)
+        {
+            throw std::runtime_error("failed to load image texture");
+        }
+
+        std::unique_ptr<vk::raii::Buffer> stagingBuffer;
+        std::unique_ptr<vk::raii::DeviceMemory> stagingBufferMemory;
+
+        std::tie(stagingBuffer, stagingBufferMemory) = constructors::createBuffer(device, physicalDevice, imageSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        void *data = stagingBufferMemory->mapMemory(0, imageSize);
+        memcpy(data, pixels, static_cast<size_t>(imageSize));
+        stagingBufferMemory->unmapMemory();
+        stbi_image_free(pixels);
+
+        std::unique_ptr<vk::raii::Image> image;
+        std::unique_ptr<vk::raii::DeviceMemory> imageMemory;
+        std::tie(image, imageMemory) = createImage(device, physicalDevice, textureWidth, textureHeight, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal);
+
+        transitionImageLayout(*image.get(), vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+        copyBufferToImage(*stagingBuffer.get(), *image.get(), static_cast<uint32_t>(textureWidth), static_cast<uint32_t>(textureHeight));
+        transitionImageLayout(*image.get(), vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+
+        return std::make_tuple(std::move(image), std::move(imageMemory));
+    }
+
     bool VulkanRenderer::render()
     {
         vk::Result result = _device->waitForFences({*_inFlightFence[_currentFrame]}, vk::True, UINT64_MAX);
@@ -282,7 +472,7 @@ namespace lava::rendering
             return true;
         }
         _device->resetFences({*_inFlightFence[_currentFrame]});
-        const vk::raii::CommandBuffer& commandBuffer = _commandBuffers->at(_currentFrame);
+        const vk::raii::CommandBuffer &commandBuffer = _commandBuffers->at(_currentFrame);
         commandBuffer.reset();
 
         recordCommandBuffer(commandBuffer, imageIndex);
@@ -353,7 +543,6 @@ namespace lava::rendering
 
         commandBuffer.begin(beginInfo);
 
-
         _renderpass->begin(commandBuffer, *_renderContext.get(), imageIndex);
         {
             commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, _graphicsPipeline->getVkPipeline());
@@ -377,7 +566,7 @@ namespace lava::rendering
             vk::DeviceSize offsets[] = {0};
             commandBuffer.bindVertexBuffers(0, vertexBuffers, offsets);
             commandBuffer.bindIndexBuffer(*_indexBuffer.get(), {0}, vk::IndexType::eUint32);
-            
+
             commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, _graphicsPipeline->getVkPipelineLayout(), 0, {_descriptorSets->at(_currentFrame)}, nullptr);
             commandBuffer.drawIndexed(static_cast<uint32_t>(_mesh.indices.size()), 1, 0, 0, 0);
         }

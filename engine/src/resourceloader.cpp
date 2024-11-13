@@ -22,7 +22,7 @@ namespace lava::resourceloader
         file.close();
         return buffer;
     }
-    std::vector<std::string_view> split(const std::string_view& line, const std::string &delimiter)
+    std::vector<std::string_view> split(const std::string_view& line, char delimiter)
     {
         std::vector<std::string_view> result;
         size_t pos = 0;
@@ -52,16 +52,15 @@ namespace lava::resourceloader
         std::vector<glm::vec3> normals;
         std::vector<glm::vec2> texcoords;
 
-        const std::string space = " ";
-        const std::string slash = "/";
-
         rendering::data::Mesh mesh;
         mesh.indices.clear();
         mesh.vertices.clear();
+        uint32_t indices = 0;
         while (std::getline(infile, line))
         {
             std::istringstream iss(line);
-            auto parts = split(line, space);
+            if(line[0] == '#') continue;
+            auto parts = split(line, ' ');
             if (parts[0] == "v")
             {
                 float x, y, z;
@@ -89,7 +88,7 @@ namespace lava::resourceloader
             {
                 for (size_t i = 1; i < parts.size(); i++)
                 {
-                    auto faceParts = split(parts[i], slash);
+                    auto faceParts = split(parts[i], '/');
                     int v = std::atoi(faceParts[0].data());
                     int vt = std::atoi(faceParts[1].data());
                     int vn = std::atoi(faceParts[2].data());
@@ -99,7 +98,7 @@ namespace lava::resourceloader
                     vertex.normal = normals[vn - 1];
                     vertex.texCoord = texcoords[vt - 1];
 
-                    mesh.indices.push_back(static_cast<uint32_t>(mesh.vertices.size()));
+                    mesh.indices.push_back(indices++);
                     mesh.vertices.push_back(vertex);
                 }
             }
