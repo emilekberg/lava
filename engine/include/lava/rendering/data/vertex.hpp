@@ -2,6 +2,8 @@
 #include <vulkan/vulkan.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec2.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
 namespace lava::rendering::data
 {
     struct Vertex
@@ -42,6 +44,15 @@ namespace lava::rendering::data
             attributeDescriptions[2].setFormat(vk::Format::eR32G32Sfloat);
             attributeDescriptions[2].setOffset(offsetof(Vertex, texCoord));
             return attributeDescriptions;
+        }
+    };
+}
+namespace std {
+    template<> struct hash<lava::rendering::data::Vertex> {
+        size_t operator()(lava::rendering::data::Vertex const& vertex) const {
+            return ((std::hash<glm::vec3>()(vertex.position) ^
+                   (std::hash<glm::vec3>()(vertex.normal) << 1)) >> 1) ^
+                   (std::hash<glm::vec2>()(vertex.texCoord) << 1);
         }
     };
 }

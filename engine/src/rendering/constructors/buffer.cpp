@@ -13,7 +13,7 @@ namespace lava::rendering::constructors
         }
         throw std::runtime_error("failed to find suitable memory type!");
     }
-    std::tuple<std::unique_ptr<vk::raii::Buffer>, std::unique_ptr<vk::raii::DeviceMemory>> createBuffer(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice, vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties)
+    std::tuple<vk::raii::Buffer, vk::raii::DeviceMemory> createBuffer(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice, vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties)
     {
         vk::BufferCreateInfo bufferInfo{};
         bufferInfo.setSize(size);
@@ -31,6 +31,6 @@ namespace lava::rendering::constructors
         vk::raii::DeviceMemory bufferMemory(device, allocInfo);
         buffer.bindMemory(bufferMemory, 0);
 
-        return std::make_tuple(std::make_unique<vk::raii::Buffer>(std::move(buffer)), std::make_unique<vk::raii::DeviceMemory>(std::move(bufferMemory)));
+        return std::make_tuple(std::move(buffer), std::move(bufferMemory));
     }
 }

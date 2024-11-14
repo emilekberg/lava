@@ -24,6 +24,7 @@ namespace lava::rendering::constructors
         }
 
         vk::PhysicalDeviceFeatures deviceFeatures{};
+        deviceFeatures.setSamplerAnisotropy(vk::True);
 
         vk::DeviceCreateInfo createInfo{};
         createInfo.pQueueCreateInfos = queueCreateInfos.data();

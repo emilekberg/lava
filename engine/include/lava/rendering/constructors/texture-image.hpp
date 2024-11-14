@@ -45,13 +45,13 @@ namespace lava::rendering::constructors
             throw std::runtime_error("failed to load image texture");
         }
 
-        std::unique_ptr<vk::raii::Buffer> stagingBuffer;
-        std::unique_ptr<vk::raii::DeviceMemory> stagingBufferMemory;
+        vk::raii::Buffer stagingBuffer = VK_NULL_HANDLE;
+        vk::raii::DeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
 
         std::tie(stagingBuffer, stagingBufferMemory) = createBuffer(device, physicalDevice, imageSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-        void* data = stagingBufferMemory->mapMemory(0, imageSize);
+        void* data = stagingBufferMemory.mapMemory(0, imageSize);
         memcpy(data, pixels, static_cast<size_t>(imageSize));
-        stagingBufferMemory->unmapMemory();
+        stagingBufferMemory.unmapMemory();
         stbi_image_free(pixels);
 
         std::unique_ptr<vk::raii::Image> image = createImage(device, physicalDevice, textureWidth, textureHeight, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal);

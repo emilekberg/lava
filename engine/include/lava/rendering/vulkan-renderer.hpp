@@ -48,6 +48,8 @@ namespace lava::rendering
  
         std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> createImage(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice, uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties);
         std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> createTextureImage(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice);
+        std::unique_ptr<vk::raii::ImageView> createTextureImageView();
+        void createTextureSampler();
 
         const uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -93,6 +95,8 @@ namespace lava::rendering
 
         std::unique_ptr<vk::raii::Image> _image;
         std::unique_ptr<vk::raii::DeviceMemory> _imageMemory;
+        std::unique_ptr<vk::raii::ImageView> _imageView;
+        std::unique_ptr<vk::raii::Sampler> _sampler;
         // vk::Format _swapchainImageFormat;
         // vk::Extent2D _swapchainExtent;
 

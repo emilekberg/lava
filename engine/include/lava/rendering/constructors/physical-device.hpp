@@ -33,6 +33,8 @@ namespace lava::rendering::constructors
             return false;
         if (physicalDevice.getProperties().deviceType != vk::PhysicalDeviceType::eDiscreteGpu)
             return false;
+        if (!physicalDevice.getFeatures().samplerAnisotropy)
+            return false;
         if (!physicalDevice.getFeatures().geometryShader)
             return false;
         if (!checkDeviceExtensionsSupport(physicalDevice, deviceExtensions))

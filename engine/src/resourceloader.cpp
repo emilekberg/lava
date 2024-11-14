@@ -56,6 +56,7 @@ namespace lava::resourceloader
         mesh.indices.clear();
         mesh.vertices.clear();
         uint32_t indices = 0;
+        std::unordered_map<rendering::data::Vertex, uint32_t> uniqueVertices{};
         while (std::getline(infile, line))
         {
             std::istringstream iss(line);
@@ -82,7 +83,7 @@ namespace lava::resourceloader
                 float x, y;
                 x = static_cast<float>(std::atof(parts[1].data()));
                 y = static_cast<float>(std::atof(parts[2].data()));
-                texcoords.push_back(glm::vec2(x, y));
+                texcoords.push_back(glm::vec2(x, 1-y));
             }
             else if (parts[0] == "f")
             {
@@ -98,8 +99,11 @@ namespace lava::resourceloader
                     vertex.normal = normals[vn - 1];
                     vertex.texCoord = texcoords[vt - 1];
 
-                    mesh.indices.push_back(indices++);
-                    mesh.vertices.push_back(vertex);
+                    if (uniqueVertices.count(vertex) == 0) {
+                        uniqueVertices[vertex] = static_cast<uint32_t>(mesh.vertices.size());
+                        mesh.vertices.push_back(vertex);
+                    }
+                    mesh.indices.push_back(uniqueVertices[vertex]);
                 }
             }
         }
