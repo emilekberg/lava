@@ -4,6 +4,11 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <vulkan/vulkan_raii.hpp>
+#include <memory>
+#include "lava/rendering/constructors/buffer.hpp"
+#include <tuple>
+#include "vendor/stb-img.h"
 namespace lava::resourceloader
 {
     std::vector<char> readfile(const std::string &filepath)
@@ -22,6 +27,59 @@ namespace lava::resourceloader
         file.close();
         return buffer;
     }
+    std::unique_ptr<rendering::Buffer> loadImageToStagingBuffer(std::string filepath, const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice)
+    {
+        int textureWidth, textureHeight, textureChannels;
+        stbi_uc *pixels = stbi_load(filepath.data(), &textureWidth, &textureHeight, &textureChannels, STBI_rgb_alpha);
+
+        vk::DeviceSize imageSize = textureWidth * textureHeight * 4;
+
+        if (!pixels)
+        {
+            throw std::runtime_error("failed to load image texture");
+        }
+
+        auto stagingBuffer = std::make_unique<rendering::Buffer>(device, physicalDevice, imageSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+
+        stagingBuffer->mapMemory(0, imageSize, [&](void* mappedMemory) {
+            memcpy(mappedMemory, pixels, static_cast<size_t>(imageSize));
+        });
+        stbi_image_free(pixels);
+        return std::move(stagingBuffer);
+    }
+    std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> loadImageToTexture(std::string filepath, const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice)
+    {
+        std::unique_ptr<rendering::Buffer> buffer = loadImageToStagingBuffer(filepath, device, physicalDevice);
+        int width = 1024;
+        int height = 1024;
+        vk::ImageCreateInfo imageInfo{};
+        imageInfo
+            .setImageType(vk::ImageType::e2D)
+            .setExtent({static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1})
+            .setMipLevels(1)
+            .setArrayLayers(1)
+            .setFormat(vk::Format::eR8G8B8A8Srgb)
+            .setTiling(vk::ImageTiling::eOptimal)
+            .setInitialLayout(vk::ImageLayout::eUndefined)
+            .setUsage(vk::ImageUsageFlagBits::eTransferDst |vk::ImageUsageFlagBits::eSampled)
+            .setSharingMode(vk::SharingMode::eExclusive)
+            .setSamples(vk::SampleCountFlagBits::e1);
+
+        
+        auto image = std::make_unique<vk::raii::Image>(device, imageInfo);
+        auto memoryRequirements = image->getMemoryRequirements();
+
+        vk::MemoryAllocateInfo allocInfo{};
+        allocInfo
+            .setAllocationSize(memoryRequirements.size)
+            .setMemoryTypeIndex(rendering::Buffer::findMemoryType(physicalDevice, memoryRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal));
+
+        auto memory = std::make_unique<vk::raii::DeviceMemory>(std::move(device.allocateMemory(allocInfo)));
+        image->bindMemory(*memory.get(), 0);
+
+        return std::make_tuple(std::move(image), std::move(memory));
+    }
+
     std::vector<std::string_view> split(const std::string_view& line, char delimiter)
     {
         std::vector<std::string_view> result;

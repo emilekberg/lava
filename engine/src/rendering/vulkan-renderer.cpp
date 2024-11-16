@@ -17,7 +17,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 #include "lava/resourceloader.hpp"
-#include "lava/rendering/constructors/texture-image.hpp"
+// #include "lava/rendering/constructors/texture-image.hpp"
 #define UNHANDLED_PARAMETER(param) param;
 #undef max
 namespace lava::rendering
@@ -471,31 +471,17 @@ namespace lava::rendering
     }
     std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> VulkanRenderer::createTextureImage(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice)
     {
-        int textureWidth, textureHeight, textureChannels;
-        stbi_uc *pixels = stbi_load("./build/mesh/viking_room.png", &textureWidth, &textureHeight, &textureChannels, STBI_rgb_alpha);
-
-        vk::DeviceSize imageSize = textureWidth * textureHeight * 4;
-
-        if (!pixels)
-        {
-            throw std::runtime_error("failed to load image texture");
-        }
-
-        vk::raii::Buffer stagingBuffer = VK_NULL_HANDLE;
-        vk::raii::DeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
-
-        std::tie(stagingBuffer, stagingBufferMemory) = constructors::createBuffer(device, physicalDevice, imageSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-        void *data = stagingBufferMemory.mapMemory(0, imageSize);
-        memcpy(data, pixels, static_cast<size_t>(imageSize));
-        stagingBufferMemory.unmapMemory();
-        stbi_image_free(pixels);
+        // std::tie(image, memory) = resourceloader::loadImageToTexture("./build/mesh/viking_room.png", device, physicalDevice);
+        std::unique_ptr<rendering::Buffer> buffer = resourceloader::loadImageToStagingBuffer("./build/mesh/viking_room.png", device, physicalDevice);
+        int width = 1024;
+        int height = 1024;
 
         std::unique_ptr<vk::raii::Image> image;
         std::unique_ptr<vk::raii::DeviceMemory> imageMemory;
-        std::tie(image, imageMemory) = createImage(device, physicalDevice, textureWidth, textureHeight, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal);
+        std::tie(image, imageMemory) = createImage(device, physicalDevice, width, height, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal);
 
         transitionImageLayout(*image.get(), vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
-        copyBufferToImage(stagingBuffer, *image.get(), static_cast<uint32_t>(textureWidth), static_cast<uint32_t>(textureHeight));
+        copyBufferToImage(buffer->getVkBuffer(), *image.get(), static_cast<uint32_t>(width), static_cast<uint32_t>(height));
         transitionImageLayout(*image.get(), vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
 
         return std::make_tuple(std::move(image), std::move(imageMemory));
