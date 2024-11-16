@@ -518,11 +518,11 @@ namespace lava::rendering
         int width;
         int height;
         std::unique_ptr<Buffer> buffer = resourceloader::loadImageToStagingBuffer("./build/mesh/viking_room.png", device, physicalDevice, &width, &height);
-        std::unique_ptr<data::Texture> texture = std::make_unique<data::Texture>(device, physicalDevice, *buffer.get(), width, height);
+        std::unique_ptr<data::Texture> texture = std::make_unique<data::Texture>(device, physicalDevice, width, height, vk::Format::eR8G8B8A8Srgb);
 
-        transitionImageLayout(texture->getVkImage(), vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+        transitionImageLayout(texture->getVkImage(), texture->getFormat(), vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
         copyBufferToImage(buffer->getVkBuffer(), texture->getVkImage(), static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-        transitionImageLayout(texture->getVkImage(), vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+        transitionImageLayout(texture->getVkImage(),  texture->getFormat(), vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
 
         return texture;
     }

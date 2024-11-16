@@ -2,8 +2,8 @@
 
 namespace lava::rendering::data
 {
-    Texture::Texture(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice, rendering::Buffer &stagingBuffer, int width, int height)
-        : _width(width), _height(height), _image(VK_NULL_HANDLE), _memory(VK_NULL_HANDLE)
+    Texture::Texture(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice, int width, int height, vk::Format format)
+        : _width(width), _height(height), _image(VK_NULL_HANDLE), _memory(VK_NULL_HANDLE), _format(format)
     {
         vk::ImageCreateInfo imageInfo{};
         imageInfo
@@ -11,7 +11,7 @@ namespace lava::rendering::data
             .setExtent({static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1})
             .setMipLevels(1)
             .setArrayLayers(1)
-            .setFormat(vk::Format::eR8G8B8A8Srgb)
+            .setFormat(format)
             .setTiling(vk::ImageTiling::eOptimal)
             .setInitialLayout(vk::ImageLayout::eUndefined)
             .setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled)

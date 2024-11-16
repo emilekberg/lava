@@ -83,7 +83,7 @@ namespace lava::resourceloader
     {
         int width, height;
         std::unique_ptr<rendering::Buffer> buffer = loadImageToStagingBuffer(filepath, device, physicalDevice, &width, &height);
-        return std::make_unique<rendering::data::Texture>(device, physicalDevice, *buffer.get(), width, height);
+        return std::make_unique<rendering::data::Texture>(device, physicalDevice, width, height, vk::Format::eR8G8B8A8Srgb);
     }
 
     std::vector<std::string_view> split(const std::string_view& line, char delimiter)
