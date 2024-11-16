@@ -12,6 +12,7 @@
 #include "lava/rendering/data/uniform-buffer-object.hpp"
 #include "lava/rendering/renderpass.hpp"
 #include "lava/rendering/render-context.hpp"
+#include "lava/rendering/data/texture.hpp"
 namespace lava::rendering
 {
     class VulkanRenderer
@@ -76,16 +77,15 @@ namespace lava::rendering
         
         std::vector<vk::raii::Fence> _inFlightFence;
         
-        std::unique_ptr<vk::raii::DeviceMemory> _vertexBufferMemory;
-        std::unique_ptr<vk::raii::Buffer> _vertexBuffer;
-        std::unique_ptr<vk::raii::DeviceMemory> _indexBufferMemory;
-        std::unique_ptr<vk::raii::Buffer> _indexBuffer; 
+        std::unique_ptr<Buffer> _vertexBuffer;
+        std::unique_ptr<Buffer> _indexBuffer;
         
         std::unique_ptr<vk::raii::DescriptorPool> _descriptorPool;
         std::unique_ptr<vk::raii::DescriptorSets> _descriptorSets;
 
-        std::vector<std::unique_ptr<vk::raii::DeviceMemory>> _uniformBufferMemories;
-        std::vector<std::unique_ptr<vk::raii::Buffer>> _uniformBuffers;
+        // std::vector<std::unique_ptr<vk::raii::DeviceMemory>> _uniformBufferMemories;
+        // std::vector<std::unique_ptr<vk::raii::Buffer>> _uniformBuffers;
+        std::vector<std::unique_ptr<Buffer>> _uniformBuffers;
         std::vector<void*> _uniformBuffersMapped;
         
         std::vector<const char *> _validationLayers;
@@ -95,6 +95,7 @@ namespace lava::rendering
 
         std::unique_ptr<vk::raii::Image> _image;
         std::unique_ptr<vk::raii::DeviceMemory> _imageMemory;
+        //std::unique_ptr<lava::rendering::data::Texture> _texture;
         std::unique_ptr<vk::raii::ImageView> _imageView;
         std::unique_ptr<vk::raii::Sampler> _sampler;
         // vk::Format _swapchainImageFormat;

@@ -80,6 +80,15 @@ namespace lava::resourceloader
         return std::make_tuple(std::move(image), std::move(memory));
     }
 
+    std::unique_ptr<rendering::data::Texture> loadImageToTexture2(std::string filepath, const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice)
+    {
+        std::unique_ptr<rendering::Buffer> buffer = loadImageToStagingBuffer(filepath, device, physicalDevice);
+        int width = 1024;
+        int height = 1024;
+        return std::make_unique<rendering::data::Texture>(device, physicalDevice, *buffer.get(), width, height);
+    }
+
+
     std::vector<std::string_view> split(const std::string_view& line, char delimiter)
     {
         std::vector<std::string_view> result;

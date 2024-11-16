@@ -43,6 +43,17 @@ namespace lava::rendering
         _vkDeviceMemory.unmapMemory();
     }
 
+    void* Buffer::mapMemory(vk::DeviceSize offset, vk::DeviceSize size)
+    {
+        void* mappedMemory = _vkDeviceMemory.mapMemory(offset, size);
+        return mappedMemory;
+    }
+
+    void Buffer::unmapMemory()
+    {
+        _vkDeviceMemory.unmapMemory();
+    }
+
     uint32_t Buffer::findMemoryType(const vk::raii::PhysicalDevice& physicalDevice, uint32_t typeFilter, vk::MemoryPropertyFlags properties)
     {
         vk::PhysicalDeviceMemoryProperties memoryProperties = physicalDevice.getMemoryProperties();

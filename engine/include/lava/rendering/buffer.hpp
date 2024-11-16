@@ -13,6 +13,8 @@ namespace lava::rendering
         vk::raii::DeviceMemory& getVkDeviceMemory();
 
         void mapMemory(vk::DeviceSize offset, vk::DeviceSize size, std::function<void(void*)> callback);
+        void* mapMemory(vk::DeviceSize offset, vk::DeviceSize size);
+        void unmapMemory();
 
         static uint32_t findMemoryType(const vk::raii::PhysicalDevice& physicalDevice, uint32_t typeFilter, vk::MemoryPropertyFlags properties);
     private:

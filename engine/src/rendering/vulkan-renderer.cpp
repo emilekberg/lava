@@ -51,6 +51,13 @@ namespace lava::rendering
 
 
         std::tie(_image, _imageMemory) = createTextureImage(*_device.get(), *_physicalDevice.get());
+        //_texture = resourceloader::loadImageToTexture2("./build/mesh/viking_room.png", *_device.get(), *_physicalDevice.get());
+        
+        //transitionImageLayout(_image, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+        //copyBufferToImage(stagingBuffer.getVkBuffer(), _image, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+        //transitionImageLayout(_image, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+
+        
         _imageView = createTextureImageView();
         createTextureSampler();
  
@@ -119,6 +126,14 @@ namespace lava::rendering
     void VulkanRenderer::createVertexBuffers()
     {
         vk::DeviceSize bufferSize = sizeof(_mesh.vertices[0]) * _mesh.vertices.size();
+        Buffer stagingBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        stagingBuffer.mapMemory(0, bufferSize, [&](void* memory)
+        {
+            memcpy(memory, _mesh.vertices.data(), (size_t)bufferSize);
+        });
+        _vertexBuffer = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
+        copyBuffer(stagingBuffer.getVkBuffer(), _vertexBuffer->getVkBuffer(), bufferSize);
+        /*
         vk::raii::Buffer stagingBuffer = VK_NULL_HANDLE;
         vk::raii::DeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
 
@@ -135,10 +150,22 @@ namespace lava::rendering
         
         _vertexBuffer = std::make_unique<vk::raii::Buffer>(std::move(vertexBuffer));
         _vertexBufferMemory = std::make_unique<vk::raii::DeviceMemory>(std::move(vertexBufferMemory));
+        */
     }
 
     void VulkanRenderer::createIndexBuffers()
     {
+        vk::DeviceSize bufferSize = sizeof(_mesh.indices[0]) * _mesh.indices.size();
+        Buffer stagingBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        stagingBuffer.mapMemory(0, bufferSize, [&](void* memory)
+        {
+            memcpy(memory, _mesh.indices.data(), (size_t)bufferSize);
+        });
+        _indexBuffer = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
+        copyBuffer(stagingBuffer.getVkBuffer(), _indexBuffer->getVkBuffer(), bufferSize);
+
+        /*
+
         vk::DeviceSize bufferSize = sizeof(_mesh.indices[0]) * _mesh.indices.size();
         vk::raii::Buffer stagingBuffer = VK_NULL_HANDLE;
         vk::raii::DeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
@@ -156,6 +183,7 @@ namespace lava::rendering
 
         _indexBuffer = std::make_unique<vk::raii::Buffer>(std::move(indexBuffer));
         _indexBufferMemory = std::make_unique<vk::raii::DeviceMemory>(std::move(indexBufferMemory));
+        */
 
     }
 
@@ -163,18 +191,18 @@ namespace lava::rendering
     {
         vk::DeviceSize bufferSize = sizeof(data::UniformBufferObject);
         _uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-        _uniformBufferMemories.resize(MAX_FRAMES_IN_FLIGHT);
+        // _uniformBufferMemories.resize(MAX_FRAMES_IN_FLIGHT);
         _uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            vk::raii::Buffer uniformBuffer = VK_NULL_HANDLE;
-            vk::raii::DeviceMemory uniformBufferMemory = VK_NULL_HANDLE;
-            std::tie(uniformBuffer, uniformBufferMemory) = constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-            _uniformBuffers[i] = std::make_unique<vk::raii::Buffer>(std::move(uniformBuffer));
-            _uniformBufferMemories[i] = std::make_unique<vk::raii::DeviceMemory>(std::move(uniformBufferMemory));
-
-            _uniformBuffersMapped[i] = _uniformBufferMemories[i]->mapMemory(0, bufferSize);
+            // vk::raii::Buffer uniformBuffer = VK_NULL_HANDLE;
+            // vk::raii::DeviceMemory uniformBufferMemory = VK_NULL_HANDLE;
+            // std::tie(uniformBuffer, uniformBufferMemory) = constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+            //_uniformBuffers[i] = std::make_unique<vk::raii::Buffer>(std::move(uniformBuffer));
+            //_uniformBufferMemories[i] = std::make_unique<vk::raii::DeviceMemory>(std::move(uniformBufferMemory));
+            _uniformBuffers[i] = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+            _uniformBuffersMapped[i] = _uniformBuffers[i]->mapMemory(0, bufferSize);
         }
     }
 
@@ -217,7 +245,7 @@ namespace lava::rendering
         {
             vk::DescriptorBufferInfo bufferInfo{};
             bufferInfo
-                .setBuffer(*_uniformBuffers[i].get())
+                .setBuffer(_uniformBuffers[i]->getVkBuffer())
                 .setOffset(0)
                 .setRange(sizeof(data::UniformBufferObject));
 
@@ -640,10 +668,10 @@ namespace lava::rendering
                 .setExtent(_renderContext->getExtent());
             commandBuffer.setScissor(0, scissor);
 
-            vk::Buffer vertexBuffers[] = {*_vertexBuffer.get()};
+            vk::Buffer vertexBuffers[] = {_vertexBuffer->getVkBuffer()};
             vk::DeviceSize offsets[] = {0};
             commandBuffer.bindVertexBuffers(0, vertexBuffers, offsets);
-            commandBuffer.bindIndexBuffer(*_indexBuffer.get(), {0}, vk::IndexType::eUint32);
+            commandBuffer.bindIndexBuffer(_indexBuffer->getVkBuffer(), {0}, vk::IndexType::eUint32);
 
             commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, _graphicsPipeline->getVkPipelineLayout(), 0, {_descriptorSets->at(_currentFrame)}, nullptr);
             commandBuffer.drawIndexed(static_cast<uint32_t>(_mesh.indices.size()), 1, 0, 0, 0);
