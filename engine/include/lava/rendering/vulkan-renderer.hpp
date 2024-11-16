@@ -49,6 +49,8 @@ namespace lava::rendering
  
         std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> createImage(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice, uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties);
         std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> createTextureImage(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice);
+        std::unique_ptr<data::Texture> createTexture(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice);
+
         std::unique_ptr<vk::raii::ImageView> createTextureImageView();
         void createTextureSampler();
 
@@ -83,8 +85,6 @@ namespace lava::rendering
         std::unique_ptr<vk::raii::DescriptorPool> _descriptorPool;
         std::unique_ptr<vk::raii::DescriptorSets> _descriptorSets;
 
-        // std::vector<std::unique_ptr<vk::raii::DeviceMemory>> _uniformBufferMemories;
-        // std::vector<std::unique_ptr<vk::raii::Buffer>> _uniformBuffers;
         std::vector<std::unique_ptr<Buffer>> _uniformBuffers;
         std::vector<void*> _uniformBuffersMapped;
         
@@ -93,9 +93,9 @@ namespace lava::rendering
 
 
 
-        std::unique_ptr<vk::raii::Image> _image;
-        std::unique_ptr<vk::raii::DeviceMemory> _imageMemory;
-        //std::unique_ptr<lava::rendering::data::Texture> _texture;
+        // std::unique_ptr<vk::raii::Image> _image;
+        // std::unique_ptr<vk::raii::DeviceMemory> _imageMemory;
+        std::unique_ptr<lava::rendering::data::Texture> _texture;
         std::unique_ptr<vk::raii::ImageView> _imageView;
         std::unique_ptr<vk::raii::Sampler> _sampler;
         // vk::Format _swapchainImageFormat;

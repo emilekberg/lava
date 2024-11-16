@@ -50,7 +50,8 @@ namespace lava::rendering
         _shortlivedCommandPool = constructors::createTransientCommandPool(*_device.get(), *_physicalDevice.get(), *_surface.get());
 
 
-        std::tie(_image, _imageMemory) = createTextureImage(*_device.get(), *_physicalDevice.get());
+        _texture = createTexture(*_device.get(), *_physicalDevice.get());
+        //std::tie(_image, _imageMemory) = createTextureImage(*_device.get(), *_physicalDevice.get());
         //_texture = resourceloader::loadImageToTexture2("./build/mesh/viking_room.png", *_device.get(), *_physicalDevice.get());
         
         //transitionImageLayout(_image, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
@@ -499,11 +500,8 @@ namespace lava::rendering
     }
     std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> VulkanRenderer::createTextureImage(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice)
     {
-        // std::tie(image, memory) = resourceloader::loadImageToTexture("./build/mesh/viking_room.png", device, physicalDevice);
-        std::unique_ptr<rendering::Buffer> buffer = resourceloader::loadImageToStagingBuffer("./build/mesh/viking_room.png", device, physicalDevice);
-        int width = 1024;
-        int height = 1024;
-
+        int width, height;
+        std::unique_ptr<rendering::Buffer> buffer = resourceloader::loadImageToStagingBuffer("./build/mesh/viking_room.png", device, physicalDevice, &width, &height);
         std::unique_ptr<vk::raii::Image> image;
         std::unique_ptr<vk::raii::DeviceMemory> imageMemory;
         std::tie(image, imageMemory) = createImage(device, physicalDevice, width, height, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal);
@@ -515,9 +513,23 @@ namespace lava::rendering
         return std::make_tuple(std::move(image), std::move(imageMemory));
     }
 
+    std::unique_ptr<data::Texture> VulkanRenderer::createTexture(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice)
+    {
+        int width;
+        int height;
+        std::unique_ptr<Buffer> buffer = resourceloader::loadImageToStagingBuffer("./build/mesh/viking_room.png", device, physicalDevice, &width, &height);
+        std::unique_ptr<data::Texture> texture = std::make_unique<data::Texture>(device, physicalDevice, *buffer.get(), width, height);
+
+        transitionImageLayout(texture->getVkImage(), vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+        copyBufferToImage(buffer->getVkBuffer(), texture->getVkImage(), static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+        transitionImageLayout(texture->getVkImage(), vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+
+        return texture;
+    }
+
     std::unique_ptr<vk::raii::ImageView> VulkanRenderer::createTextureImageView()
     {
-        return std::make_unique<vk::raii::ImageView>(constructors::createImageView(*_device.get(), *_image.get(), vk::Format::eR8G8B8A8Srgb));
+        return std::make_unique<vk::raii::ImageView>(constructors::createImageView(*_device.get(), _texture->getVkImage(), vk::Format::eR8G8B8A8Srgb));
     }
 
     void VulkanRenderer::createTextureSampler()

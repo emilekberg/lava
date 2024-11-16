@@ -17,7 +17,7 @@ namespace lava::resourceloader
 
     std::vector<char> readfile(const std::string& filepath);
     rendering::data::Mesh loadMesh(const std::string& filepath);
-    std::unique_ptr<rendering::Buffer> loadImageToStagingBuffer(std::string filepath, const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice);
+    std::unique_ptr<rendering::Buffer> loadImageToStagingBuffer(std::string filepath, const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice, int* width, int* height);
     std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> loadImageToTexture(std::string filepath, const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice);
     std::unique_ptr<rendering::data::Texture> loadImageToTexture2(std::string filepath, const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice);
 

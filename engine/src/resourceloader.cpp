@@ -27,12 +27,12 @@ namespace lava::resourceloader
         file.close();
         return buffer;
     }
-    std::unique_ptr<rendering::Buffer> loadImageToStagingBuffer(std::string filepath, const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice)
+    std::unique_ptr<rendering::Buffer> loadImageToStagingBuffer(std::string filepath, const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice, int* width, int* height)
     {
-        int textureWidth, textureHeight, textureChannels;
-        stbi_uc *pixels = stbi_load(filepath.data(), &textureWidth, &textureHeight, &textureChannels, STBI_rgb_alpha);
+        int textureChannels;
+        stbi_uc *pixels = stbi_load(filepath.data(), width, height, &textureChannels, STBI_rgb_alpha);
 
-        vk::DeviceSize imageSize = textureWidth * textureHeight * 4;
+        vk::DeviceSize imageSize = (*width) * (*height) * 4;
 
         if (!pixels)
         {
@@ -49,9 +49,8 @@ namespace lava::resourceloader
     }
     std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> loadImageToTexture(std::string filepath, const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice)
     {
-        std::unique_ptr<rendering::Buffer> buffer = loadImageToStagingBuffer(filepath, device, physicalDevice);
-        int width = 1024;
-        int height = 1024;
+        int width, height;
+        std::unique_ptr<rendering::Buffer> buffer = loadImageToStagingBuffer(filepath, device, physicalDevice, &width, &height);
         vk::ImageCreateInfo imageInfo{};
         imageInfo
             .setImageType(vk::ImageType::e2D)
@@ -82,12 +81,10 @@ namespace lava::resourceloader
 
     std::unique_ptr<rendering::data::Texture> loadImageToTexture2(std::string filepath, const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice)
     {
-        std::unique_ptr<rendering::Buffer> buffer = loadImageToStagingBuffer(filepath, device, physicalDevice);
-        int width = 1024;
-        int height = 1024;
+        int width, height;
+        std::unique_ptr<rendering::Buffer> buffer = loadImageToStagingBuffer(filepath, device, physicalDevice, &width, &height);
         return std::make_unique<rendering::data::Texture>(device, physicalDevice, *buffer.get(), width, height);
     }
-
 
     std::vector<std::string_view> split(const std::string_view& line, char delimiter)
     {

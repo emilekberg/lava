@@ -13,6 +13,19 @@ namespace lava::rendering::data
         {
             return _image;
         }
+        const vk::raii::DeviceMemory& getVkMemory() const
+        {
+            return _memory;
+        }
+
+        int getWidth()
+        {
+            return _width;
+        }
+        int getHeight()
+        {
+            return _height;
+        }
 
     private:
         vk::raii::Image _image;
