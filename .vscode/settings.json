@@ -79,6 +79,7 @@
         "xstring": "cpp",
         "xtr1common": "cpp",
         "xtree": "cpp",
-        "hash_map": "cpp"
+        "hash_map": "cpp",
+        "filesystem": "cpp"
     }
 }

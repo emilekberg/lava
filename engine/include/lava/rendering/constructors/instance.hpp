@@ -17,7 +17,7 @@ namespace lava::rendering::constructors
         {
             extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         }
-        extensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+        // extensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
 
         return extensions;
     }
@@ -80,6 +80,10 @@ namespace lava::rendering::constructors
         createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
         createInfo.ppEnabledLayerNames = validationLayers.data();
 
+        for(const auto& extension : requiredExtensions)
+        {
+            fprintf(stdout, "- %s\n", extension);
+        }
         auto instance = vk::raii::Instance(context, createInfo);
         return std::move(instance);
     }

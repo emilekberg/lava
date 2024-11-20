@@ -106,9 +106,9 @@ namespace lava::rendering::builders
         rasterizer.setFrontFace(vk::FrontFace::eCounterClockwise);
 
         rasterizer.setDepthBiasEnable(vk::False);
-        rasterizer.setDepthBiasConstantFactor(0.0f);
-        rasterizer.setDepthBiasClamp(0.0f);
-        rasterizer.setDepthBiasSlopeFactor(0.0f);
+        // rasterizer.setDepthBiasConstantFactor(0.0f);
+        // rasterizer.setDepthBiasClamp(0.0f);
+        //rasterizer.setDepthBiasSlopeFactor(0.0f);
 
         vk::PipelineMultisampleStateCreateInfo multisampling{};
         multisampling.setSampleShadingEnable(vk::False);
@@ -143,6 +143,18 @@ namespace lava::rendering::builders
 
         vk::raii::PipelineLayout pipelineLayout = vk::raii::PipelineLayout(_device, pipelineLayoutCreateInfo);
 
+        vk::PipelineDepthStencilStateCreateInfo depthStencil{};
+        depthStencil
+            .setDepthTestEnable(vk::True)
+            .setDepthWriteEnable(vk::True)
+            .setDepthCompareOp(vk::CompareOp::eLess)
+            .setDepthBoundsTestEnable(vk::False)
+            // .setMinDepthBounds(0.0f)
+            //.setMaxDepthBounds(1.0f)
+            .setStencilTestEnable(vk::False);
+            //.setFront({})
+            //.setBack({});
+
         vk::GraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.setStageCount(2);
         pipelineInfo.setPStages(shaderStages);
@@ -151,9 +163,9 @@ namespace lava::rendering::builders
         pipelineInfo.setPViewportState(&viewportState);
         pipelineInfo.setPRasterizationState(&rasterizer);
         pipelineInfo.setPMultisampleState(&multisampling);
-        pipelineInfo.setPDepthStencilState(nullptr);
         pipelineInfo.setPColorBlendState(&colorBlending);
         pipelineInfo.setPDynamicState(&dynamicState);
+        pipelineInfo.setPDepthStencilState(&depthStencil);
 
         pipelineInfo.setLayout(pipelineLayout);
         pipelineInfo.setRenderPass(renderpass);

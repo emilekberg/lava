@@ -9,6 +9,7 @@
 #include "lava/rendering/constructors/buffer.hpp"
 #include <tuple>
 #include "vendor/stb-img.h"
+#include "vendor/tiny_obj_loader.h"
 namespace lava::resourceloader
 {
     std::vector<char> readfile(const std::string &filepath)
@@ -27,7 +28,7 @@ namespace lava::resourceloader
         file.close();
         return buffer;
     }
-    std::unique_ptr<rendering::Buffer> loadImageToStagingBuffer(std::string filepath, const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice, int* width, int* height)
+    std::unique_ptr<rendering::Buffer> loadImageToStagingBuffer(std::string filepath, const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice, int *width, int *height)
     {
         int textureChannels;
         stbi_uc *pixels = stbi_load(filepath.data(), width, height, &textureChannels, STBI_rgb_alpha);
@@ -41,13 +42,12 @@ namespace lava::resourceloader
 
         auto stagingBuffer = std::make_unique<rendering::Buffer>(device, physicalDevice, imageSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
-        stagingBuffer->mapMemory(0, imageSize, [&](void* mappedMemory) {
-            memcpy(mappedMemory, pixels, static_cast<size_t>(imageSize));
-        });
+        stagingBuffer->mapMemory(0, imageSize, [&](void *mappedMemory)
+                                 { memcpy(mappedMemory, pixels, static_cast<size_t>(imageSize)); });
         stbi_image_free(pixels);
         return std::move(stagingBuffer);
     }
-    std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> loadImageToTexture(std::string filepath, const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice)
+    std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> loadImageToTexture(std::string filepath, const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice)
     {
         int width, height;
         std::unique_ptr<rendering::Buffer> buffer = loadImageToStagingBuffer(filepath, device, physicalDevice, &width, &height);
@@ -60,11 +60,10 @@ namespace lava::resourceloader
             .setFormat(vk::Format::eR8G8B8A8Srgb)
             .setTiling(vk::ImageTiling::eOptimal)
             .setInitialLayout(vk::ImageLayout::eUndefined)
-            .setUsage(vk::ImageUsageFlagBits::eTransferDst |vk::ImageUsageFlagBits::eSampled)
+            .setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled)
             .setSharingMode(vk::SharingMode::eExclusive)
             .setSamples(vk::SampleCountFlagBits::e1);
 
-        
         auto image = std::make_unique<vk::raii::Image>(device, imageInfo);
         auto memoryRequirements = image->getMemoryRequirements();
 
@@ -79,14 +78,14 @@ namespace lava::resourceloader
         return std::make_tuple(std::move(image), std::move(memory));
     }
 
-    std::unique_ptr<rendering::data::Texture> loadImageToTexture2(std::string filepath, const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice)
+    std::unique_ptr<rendering::data::Texture> loadImageToTexture2(std::string filepath, const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice)
     {
         int width, height;
         std::unique_ptr<rendering::Buffer> buffer = loadImageToStagingBuffer(filepath, device, physicalDevice, &width, &height);
         return std::make_unique<rendering::data::Texture>(device, physicalDevice, width, height, vk::Format::eR8G8B8A8Srgb);
     }
 
-    std::vector<std::string_view> split(const std::string_view& line, char delimiter)
+    std::vector<std::string_view> split(const std::string_view &line, char delimiter)
     {
         std::vector<std::string_view> result;
         size_t pos = 0;
@@ -109,6 +108,56 @@ namespace lava::resourceloader
     }
     rendering::data::Mesh loadMesh(const std::string &filepath)
     {
+        rendering::data::Mesh mesh{};
+        mesh.indices.clear();
+        mesh.vertices.clear();
+        tinyobj::attrib_t attrib;
+        std::vector<tinyobj::shape_t> shapes;
+        std::vector<tinyobj::material_t> materials;
+        std::string warn, err;
+        std::unordered_map<rendering::data::Vertex, uint32_t> uniqueVertices{};
+
+        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filepath.c_str()))
+        {
+            throw std::runtime_error(warn + err);
+        }
+        for (const auto &shape : shapes)
+        {
+            for (const auto &index : shape.mesh.indices)
+            {
+                rendering::data::Vertex vertex{
+                    .position =
+                        {
+                            attrib.vertices[3 * index.vertex_index + 0],
+                            attrib.vertices[3 * index.vertex_index + 1],
+                            attrib.vertices[3 * index.vertex_index + 2],
+                        },
+                    .normal =
+                        {
+                            attrib.normals[3 * index.normal_index + 0],
+                            attrib.normals[3 * index.normal_index + 1],
+                            attrib.normals[3 * index.normal_index + 2],
+
+                        },
+                    .texCoord =
+                        {
+                            attrib.texcoords[2 * index.texcoord_index + 0],
+                            1.0f - attrib.texcoords[2 * index.texcoord_index + 1],
+                        },
+                };
+                if (uniqueVertices.count(vertex) == 0)
+                {
+                    uniqueVertices[vertex] = static_cast<uint32_t>(mesh.vertices.size());
+                    mesh.vertices.push_back(vertex);
+                }
+                mesh.indices.push_back(uniqueVertices[vertex]);
+            }
+        }
+        return mesh;
+    }
+   
+    rendering::data::Mesh loadMesh_custom(const std::string &filepath)
+    {
         std::ifstream infile(filepath);
 
         std::string line;
@@ -128,10 +177,13 @@ namespace lava::resourceloader
             auto parts = split(line, ' ');
             if (parts[0] == "v")
             {
-                float x, y, z;
+                float x, y, z, w;
                 x = static_cast<float>(std::atof(parts[1].data()));
                 y = static_cast<float>(std::atof(parts[2].data()));
                 z = static_cast<float>(std::atof(parts[3].data()));
+                if(parts.size() > 4) {
+                    w = static_cast<float>(std::atof(parts[4].data()));
+                }
                 vertices.push_back(glm::vec3(x, y, z));
             }
             else if (parts[0] == "vn")
@@ -158,12 +210,14 @@ namespace lava::resourceloader
                     int vt = std::atoi(faceParts[1].data());
                     int vn = std::atoi(faceParts[2].data());
 
-                    rendering::data::Vertex vertex{};
-                    vertex.position = vertices[v - 1];
-                    vertex.normal = normals[vn - 1];
-                    vertex.texCoord = texcoords[vt - 1];
-
-                    if (uniqueVertices.count(vertex) == 0) {
+                    rendering::data::Vertex vertex
+                    {
+                        .position = vertices[v-1],
+                        .normal = normals[vn-1],
+                        .texCoord = texcoords[vt-1]
+                    };
+                    if (uniqueVertices.count(vertex) == 0)
+                    {
                         uniqueVertices[vertex] = static_cast<uint32_t>(mesh.vertices.size());
                         mesh.vertices.push_back(vertex);
                     }
@@ -173,5 +227,4 @@ namespace lava::resourceloader
         }
         return mesh;
     }
-
 }

@@ -8,7 +8,6 @@
 #include "lava/rendering/constructors/device.hpp"
 #include "lava/rendering/constructors/swapchain.hpp"
 #include "lava/rendering/constructors/image-views.hpp"
-// #include "lava/rendering/constructors/_renderpass.hpp"
 #include "lava/rendering/constructors/framebuffers.hpp"
 #include "lava/rendering/constructors/commandpool.hpp"
 #include "lava/rendering/constructors/buffer.hpp"
@@ -17,7 +16,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 #include "lava/resourceloader.hpp"
-// #include "lava/rendering/constructors/texture-image.hpp"
 #define UNHANDLED_PARAMETER(param) param;
 #undef max
 namespace lava::rendering
@@ -26,17 +24,37 @@ namespace lava::rendering
                                                                                       _deviceExtensions({VK_KHR_SWAPCHAIN_EXTENSION_NAME}),
                                                                                       _vulkanInstance(VK_NULL_HANDLE)
     {
+        const std::vector<data::Vertex> vertices = {
+            {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+            {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+            {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+            {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+
+            {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+            {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+            {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+            {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
+        };
+
+        const std::vector<uint32_t> indices = {
+            0, 1, 2, 2, 3, 0,
+            4, 5, 6, 6, 7, 4
+        };
+        // _mesh = data::Mesh(vertices, indices);
         _mesh = lava::resourceloader::loadMesh("./build/mesh/viking_room.obj");
+        // _mesh = lava::resourceloader::loadMesh("./build/mesh/cube.obj");
+
         _vulkanInstance = constructors::createInstance(_validationLayers);
-        _debugMessenger = constructors::createDebugMessenger(_vulkanInstance);
+        if (!_validationLayers.empty())
+        {
+            _debugMessenger = constructors::createDebugMessenger(_vulkanInstance);
+        }
         _surface = constructors::createSurface(_vulkanInstance, windowHandle);
         _physicalDevice = constructors::pickPhysicalDevice(_vulkanInstance, *_surface.get(), _deviceExtensions);
         std::tie(_device, _presentQueue, _graphicsQueue) = constructors::createDevice(_vulkanInstance, *_physicalDevice.get(), *_surface.get(), _deviceExtensions, _validationLayers);
 
         _renderContext = std::make_unique<RenderContext>(*_device.get(), *_surface.get(), *_physicalDevice.get(), screenSize);
         _renderpass = std::make_unique<RenderPass>(*_device.get(), *_physicalDevice.get(), *_renderContext.get());
-
-
 
         createDescriptorSetLayout();
         _graphicsPipeline = builders::GraphicsPipelineBuilder(*_device.get())
@@ -48,20 +66,9 @@ namespace lava::rendering
                                 .build(*_descriptorSetLayout.get(), _renderpass->getRenderpass());
         _commandPool = constructors::createCommandPool(*_device.get(), *_physicalDevice.get(), *_surface.get());
         _shortlivedCommandPool = constructors::createTransientCommandPool(*_device.get(), *_physicalDevice.get(), *_surface.get());
-
-
         _texture = createTexture(*_device.get(), *_physicalDevice.get());
-        //std::tie(_image, _imageMemory) = createTextureImage(*_device.get(), *_physicalDevice.get());
-        //_texture = resourceloader::loadImageToTexture2("./build/mesh/viking_room.png", *_device.get(), *_physicalDevice.get());
-        
-        //transitionImageLayout(_image, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
-        //copyBufferToImage(stagingBuffer.getVkBuffer(), _image, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-        //transitionImageLayout(_image, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
-
-        
         _imageView = createTextureImageView();
         createTextureSampler();
- 
 
         createVertexBuffers();
         createIndexBuffers();
@@ -71,7 +78,9 @@ namespace lava::rendering
         createCommandBuffer();
         createSyncObjects();
 
-   }
+        // transition depthbuffer
+        // transitionImageLayout(_renderContext->getDepthTexture().getVkImage(), _renderContext->getDepthTexture().getFormat(), vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+    }
 
     VulkanRenderer::~VulkanRenderer()
     {
@@ -128,10 +137,8 @@ namespace lava::rendering
     {
         vk::DeviceSize bufferSize = sizeof(_mesh.vertices[0]) * _mesh.vertices.size();
         Buffer stagingBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-        stagingBuffer.mapMemory(0, bufferSize, [&](void* memory)
-        {
-            memcpy(memory, _mesh.vertices.data(), (size_t)bufferSize);
-        });
+        stagingBuffer.mapMemory(0, bufferSize, [&](void *memory)
+                                { memcpy(memory, _mesh.vertices.data(), (size_t)bufferSize); });
         _vertexBuffer = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
         copyBuffer(stagingBuffer.getVkBuffer(), _vertexBuffer->getVkBuffer(), bufferSize);
         /*
@@ -148,7 +155,7 @@ namespace lava::rendering
         vk::raii::DeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
         std::tie(vertexBuffer, vertexBufferMemory) = constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
         copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
-        
+
         _vertexBuffer = std::make_unique<vk::raii::Buffer>(std::move(vertexBuffer));
         _vertexBufferMemory = std::make_unique<vk::raii::DeviceMemory>(std::move(vertexBufferMemory));
         */
@@ -158,10 +165,8 @@ namespace lava::rendering
     {
         vk::DeviceSize bufferSize = sizeof(_mesh.indices[0]) * _mesh.indices.size();
         Buffer stagingBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-        stagingBuffer.mapMemory(0, bufferSize, [&](void* memory)
-        {
-            memcpy(memory, _mesh.indices.data(), (size_t)bufferSize);
-        });
+        stagingBuffer.mapMemory(0, bufferSize, [&](void *memory)
+                                { memcpy(memory, _mesh.indices.data(), (size_t)bufferSize); });
         _indexBuffer = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
         copyBuffer(stagingBuffer.getVkBuffer(), _indexBuffer->getVkBuffer(), bufferSize);
 
@@ -185,23 +190,16 @@ namespace lava::rendering
         _indexBuffer = std::make_unique<vk::raii::Buffer>(std::move(indexBuffer));
         _indexBufferMemory = std::make_unique<vk::raii::DeviceMemory>(std::move(indexBufferMemory));
         */
-
     }
 
     void VulkanRenderer::createUniformBuffers()
     {
         vk::DeviceSize bufferSize = sizeof(data::UniformBufferObject);
         _uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-        // _uniformBufferMemories.resize(MAX_FRAMES_IN_FLIGHT);
         _uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            // vk::raii::Buffer uniformBuffer = VK_NULL_HANDLE;
-            // vk::raii::DeviceMemory uniformBufferMemory = VK_NULL_HANDLE;
-            // std::tie(uniformBuffer, uniformBufferMemory) = constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-            //_uniformBuffers[i] = std::make_unique<vk::raii::Buffer>(std::move(uniformBuffer));
-            //_uniformBufferMemories[i] = std::make_unique<vk::raii::DeviceMemory>(std::move(uniformBufferMemory));
             _uniformBuffers[i] = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
             _uniformBuffersMapped[i] = _uniformBuffers[i]->mapMemory(0, bufferSize);
         }
@@ -257,16 +255,16 @@ namespace lava::rendering
                 .setSampler(*_sampler.get());
 
             std::array<vk::WriteDescriptorSet, 2> descriptorWrites{};
-        
+
             descriptorWrites[0]
                 .setDstSet(_descriptorSets->at(i))
                 .setDstBinding(0)
                 .setDstArrayElement(0)
                 .setDescriptorType(vk::DescriptorType::eUniformBuffer)
                 .setDescriptorCount(1)
-                .setPBufferInfo(&bufferInfo)
-                .setPImageInfo(nullptr)
-                .setPTexelBufferView(nullptr);
+                .setPBufferInfo(&bufferInfo);
+            //.setPImageInfo(nullptr)
+            //.setPTexelBufferView(nullptr);
 
             descriptorWrites[1]
                 .setDstSet(_descriptorSets->at(i))
@@ -399,7 +397,6 @@ namespace lava::rendering
                 .setDstQueueFamilyIndex(vk::QueueFamilyIgnored)
                 .setImage(image)
                 .subresourceRange
-                .setAspectMask(vk::ImageAspectFlagBits::eColor)
                 .setBaseMipLevel(0)
                 .setLevelCount(1)
                 .setBaseArrayLayer(0)
@@ -408,6 +405,18 @@ namespace lava::rendering
             vk::PipelineStageFlags sourceStage;
             vk::PipelineStageFlags destinationStage;
 
+            if(newLayout == vk::ImageLayout::eDepthStencilAttachmentOptimal)
+            {
+                barrier.subresourceRange.setAspectMask(vk::ImageAspectFlagBits::eDepth);
+                if(_renderContext->hasStencilComponent(format))
+                {
+                    barrier.subresourceRange.aspectMask |= vk::ImageAspectFlagBits::eStencil;
+                }
+            }
+            else
+            {
+                barrier.subresourceRange.setAspectMask(vk::ImageAspectFlagBits::eColor);
+            }
             if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eTransferDstOptimal)
             {
                 barrier.setSrcAccessMask(vk::AccessFlagBits::eNone);
@@ -423,6 +432,13 @@ namespace lava::rendering
 
                 sourceStage = vk::PipelineStageFlagBits::eTransfer;
                 destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
+            }
+             else if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eDepthStencilAttachmentOptimal) {
+                barrier.setSrcAccessMask(vk::AccessFlagBits::eNone);
+                barrier.setDstAccessMask(vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite);
+
+                sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
+                destinationStage = vk::PipelineStageFlagBits::eEarlyFragmentTests;
             }
             else
             {
@@ -445,28 +461,23 @@ namespace lava::rendering
     {
         beginSingleTimeCommands([&](const vk::raii::CommandBuffer &commandBuffer)
                                 {
-            vk::BufferImageCopy region{};
-            region
-                .setBufferOffset(0)
-                .setBufferRowLength(0)
-                .setBufferImageHeight(0);
+                                    vk::BufferImageCopy region{};
+                                    region
+                                        .setBufferOffset(0)
+                                        .setBufferRowLength(0)
+                                        .setBufferImageHeight(0);
 
-            region.imageSubresource
-                .setAspectMask(vk::ImageAspectFlagBits::eColor)
-                .setMipLevel(0)
-                .setBaseArrayLayer(0)
-                .setLayerCount(1);
+                                    region.imageSubresource
+                                        .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                                        .setMipLevel(0)
+                                        .setBaseArrayLayer(0)
+                                        .setLayerCount(1);
 
-            region
-                .setImageOffset({0, 0, 0})
-                .setImageExtent({width, height, 1}); 
-                
-                commandBuffer.copyBufferToImage(buffer, image, vk::ImageLayout::eTransferDstOptimal, {region});
-                
-                });
+                                    region
+                                        .setImageOffset({0, 0, 0})
+                                        .setImageExtent({width, height, 1});
 
-
-
+                                    commandBuffer.copyBufferToImage(buffer, image, vk::ImageLayout::eTransferDstOptimal, {region}); });
     }
 
     std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> VulkanRenderer::createImage(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice, uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties)
@@ -518,18 +529,26 @@ namespace lava::rendering
         int width;
         int height;
         std::unique_ptr<Buffer> buffer = resourceloader::loadImageToStagingBuffer("./build/mesh/viking_room.png", device, physicalDevice, &width, &height);
-        std::unique_ptr<data::Texture> texture = std::make_unique<data::Texture>(device, physicalDevice, width, height, vk::Format::eR8G8B8A8Srgb);
+        std::unique_ptr<data::Texture> texture = std::make_unique<data::Texture>(device, physicalDevice, width, height, vk::Format::eR8G8B8A8Srgb, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled);
 
         transitionImageLayout(texture->getVkImage(), texture->getFormat(), vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
         copyBufferToImage(buffer->getVkBuffer(), texture->getVkImage(), static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-        transitionImageLayout(texture->getVkImage(),  texture->getFormat(), vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+        transitionImageLayout(texture->getVkImage(), texture->getFormat(), vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
 
         return texture;
     }
 
+    void VulkanRenderer::createDepthResource()
+    {
+        // vk::Format depthFormat = _renderContext->findDepthFormat();
+        //_depthImage = std::make_unique<data::Texture>(*_device.get(), *_physicalDevice.get(), _renderContext->getExtent().width, _renderContext->getExtent().height, depthFormat, vk::ImageUsageFlagBits::eDepthStencilAttachment);
+
+        //_depthImageView = std::make_unique<vk::raii::ImageView>(constructors::createImageView(*_device.get(), _depthImage->getVkImage(), _depthImage->getFormat(), vk::ImageAspectFlagBits::eDepth));
+    }
+
     std::unique_ptr<vk::raii::ImageView> VulkanRenderer::createTextureImageView()
     {
-        return std::make_unique<vk::raii::ImageView>(constructors::createImageView(*_device.get(), _texture->getVkImage(), vk::Format::eR8G8B8A8Srgb));
+        return std::make_unique<vk::raii::ImageView>(constructors::createImageView(*_device.get(), _texture->getVkImage(), _texture->getFormat(), vk::ImageAspectFlagBits::eColor));
     }
 
     void VulkanRenderer::createTextureSampler()
@@ -555,7 +574,6 @@ namespace lava::rendering
             .setMaxLod(0.0f);
 
         _sampler = std::make_unique<vk::raii::Sampler>(*_device.get(), samplerInfo);
-            
     }
 
     bool VulkanRenderer::render()
@@ -672,7 +690,7 @@ namespace lava::rendering
                 .setWidth(static_cast<float>(_renderContext->getExtent().width))
                 .setHeight(static_cast<float>(_renderContext->getExtent().height))
                 .setMinDepth(0.0f)
-                .setMaxDepth(0.0f);
+                .setMaxDepth(1.0f);
             commandBuffer.setViewport(0, viewport);
 
             vk::Rect2D scissor{};

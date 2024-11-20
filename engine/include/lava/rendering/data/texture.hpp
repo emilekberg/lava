@@ -6,27 +6,28 @@ namespace lava::rendering::data
     class Texture
     {
     public:
-        Texture(const vk::raii::Device &device, const vk::raii::PhysicalDevice& physicalDevice, int width, int height, vk::Format format);
+        Texture(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice, int width, int height, vk::Format format);
+        Texture(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice, int width, int height, vk::Format format, vk::ImageUsageFlags usage);
         ~Texture();
 
-        const vk::raii::Image& getVkImage() const
+        const vk::raii::Image &getVkImage() const
         {
             return _image;
         }
-        const vk::raii::DeviceMemory& getVkMemory() const
+        const vk::raii::DeviceMemory &getVkMemory() const
         {
             return _memory;
         }
 
-        int getWidth()
+        int getWidth() const
         {
             return _width;
         }
-        int getHeight()
+        int getHeight() const
         {
             return _height;
         }
-        vk::Format getFormat()
+        const vk::Format getFormat() const
         {
             return _format;
         }

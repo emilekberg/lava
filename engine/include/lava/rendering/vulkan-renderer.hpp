@@ -46,7 +46,9 @@ namespace lava::rendering
         void recordCommandBuffer(const vk::raii::CommandBuffer &commandBuffer, uint32_t imageIndex);
         void copyBufferToImage(const vk::raii::Buffer& buffer, const vk::raii::Image& image, uint32_t width, uint32_t height);
         void updateUniformBuffer(uint32_t currentImage);
- 
+
+        void createDepthResource();
+
         std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> createImage(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice, uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties);
         std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> createTextureImage(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice);
         std::unique_ptr<data::Texture> createTexture(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice);
@@ -98,6 +100,9 @@ namespace lava::rendering
         std::unique_ptr<lava::rendering::data::Texture> _texture;
         std::unique_ptr<vk::raii::ImageView> _imageView;
         std::unique_ptr<vk::raii::Sampler> _sampler;
+       
+        std::unique_ptr<lava::rendering::data::Texture> _depthImage;
+        std::unique_ptr<vk::raii::ImageView> _depthImageView; 
         // vk::Format _swapchainImageFormat;
         // vk::Extent2D _swapchainExtent;
 

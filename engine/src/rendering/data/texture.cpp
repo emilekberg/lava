@@ -2,7 +2,7 @@
 
 namespace lava::rendering::data
 {
-    Texture::Texture(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice, int width, int height, vk::Format format)
+    Texture::Texture(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice, int width, int height, vk::Format format, vk::ImageUsageFlags usage)
         : _width(width), _height(height), _image(VK_NULL_HANDLE), _memory(VK_NULL_HANDLE), _format(format)
     {
         vk::ImageCreateInfo imageInfo{};
@@ -14,7 +14,7 @@ namespace lava::rendering::data
             .setFormat(format)
             .setTiling(vk::ImageTiling::eOptimal)
             .setInitialLayout(vk::ImageLayout::eUndefined)
-            .setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled)
+            .setUsage(usage)
             .setSharingMode(vk::SharingMode::eExclusive)
             .setSamples(vk::SampleCountFlagBits::e1);
 
@@ -29,6 +29,11 @@ namespace lava::rendering::data
         _memory = vk::raii::DeviceMemory(std::move(device.allocateMemory(allocInfo)));
         _image.bindMemory(_memory, 0);
  
+    }
+
+    Texture::Texture(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice, int width, int height, vk::Format format)
+        : Texture::Texture(device, physicalDevice, width, height, format, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled)
+    {
     }
     Texture::~Texture()
     {

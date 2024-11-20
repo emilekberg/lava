@@ -65,9 +65,14 @@ target_link_libraries(lava_engine
     Vulkan::Vulkan
     # imgui
 )
-target_compile_definitions(lava_engine PUBLIC GLFW_INCLUDE_VULKAN=${GLFW_INCLUDE_VULKAN})
-target_compile_definitions(lava_engine PUBLIC VK_USE_PLATFORM_WIN32_KHR=${VK_USE_PLATFORM_WIN32_KHR})
-target_compile_definitions(lava_engine PUBLIC GLFW_EXPOSE_NATIVE_WIN32=${GLFW_EXPOSE_NATIVE_WIN32})
-target_compile_definitions(lava_engine PUBLIC STB_IMAGE_IMPLEMENTATION=${STB_IMAGE_IMPLEMENTATION})
+target_compile_definitions(lava_engine PUBLIC GLFW_INCLUDE_VULKAN=1)
+target_compile_definitions(lava_engine PUBLIC VK_USE_PLATFORM_WIN32_KHR=1)
+target_compile_definitions(lava_engine PUBLIC GLFW_EXPOSE_NATIVE_WIN32=1)
+target_compile_definitions(lava_engine PUBLIC STB_IMAGE_IMPLEMENTATION=1)
+target_compile_definitions(lava_engine PUBLIC GLM_FORCE_RADIANS=1)
+target_compile_definitions(lava_engine PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE=1)
+target_compile_definitions(lava_engine PUBLIC GLM_ENABLE_EXPERIMENTAL=1)
+target_compile_definitions(lava_engine PUBLIC TINYOBJLOADER_IMPLEMENTATION=1)
+
 # file(COPY ./resources/basic_vert.spv DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 # file(COPY ./resources/basic_frag.spv DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

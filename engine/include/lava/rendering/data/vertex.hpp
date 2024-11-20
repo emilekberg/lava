@@ -2,7 +2,6 @@
 #include <vulkan/vulkan.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec2.hpp>
-#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 namespace lava::rendering::data
 {
