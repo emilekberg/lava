@@ -7,9 +7,9 @@ namespace lava::rendering
     {
     public:
         Buffer(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice, vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties);
-        ~Buffer();
+        // Buffer(Buffer&& other) noexcept;
 
-        vk::raii::Buffer& getVkBuffer();
+        const vk::raii::Buffer& getVkBuffer() const;
         vk::raii::DeviceMemory& getVkDeviceMemory();
 
         void mapMemory(vk::DeviceSize offset, vk::DeviceSize size, std::function<void(void*)> callback);

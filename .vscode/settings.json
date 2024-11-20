@@ -80,6 +80,7 @@
         "xtr1common": "cpp",
         "xtree": "cpp",
         "hash_map": "cpp",
-        "filesystem": "cpp"
+        "filesystem": "cpp",
+        "queue": "cpp"
     }
 }

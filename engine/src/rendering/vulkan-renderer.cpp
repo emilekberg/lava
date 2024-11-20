@@ -77,42 +77,19 @@ namespace lava::rendering
         createDescriptorSets();
         createCommandBuffer();
         createSyncObjects();
-
-        // transition depthbuffer
-        // transitionImageLayout(_renderContext->getDepthTexture().getVkImage(), _renderContext->getDepthTexture().getFormat(), vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
     }
 
-    VulkanRenderer::~VulkanRenderer()
-    {
-        // cleanupSwapChain();
-    }
-
-    void VulkanRenderer::cleanupSwapChain()
-    {
-        //_swapchainFrameBuffers.clear();
-        //_swapchainImageViews.clear();
-        //_swapchain = nullptr;
-    }
     void VulkanRenderer::recreateSwapChain(const ScreenSize &screenSize)
     {
         _device->waitIdle();
         _renderContext->resize(screenSize);
-        cleanupSwapChain();
+        // cleanupSwapChain();
     }
 
-    void VulkanRenderer::copyBuffer(const vk::raii::Buffer &sourceBuffer, const vk::raii::Buffer &destinationBuffer, vk::DeviceSize size)
+    void VulkanRenderer::copyBuffer(const vk::Buffer &sourceBuffer, const vk::Buffer &destinationBuffer, vk::DeviceSize size)
     {
-        vk::CommandBufferAllocateInfo allocInfo{};
-        allocInfo.setLevel(vk::CommandBufferLevel::ePrimary)
-            .setCommandPool(*_commandPool.get())
-            .setCommandBufferCount(1);
-
-        vk::raii::CommandBuffers commandBuffers(*_device.get(), allocInfo);
-        const vk::raii::CommandBuffer commandBuffer = std::move(commandBuffers[0]);
-
-        vk::CommandBufferBeginInfo beginInfo{};
-        beginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-        commandBuffer.begin(beginInfo);
+       beginSingleTimeCommands([&](const vk::raii::CommandBuffer& commandBuffer)
+       {
         vk::BufferCopy copyRegion;
 
         copyRegion
@@ -120,76 +97,28 @@ namespace lava::rendering
             .setDstOffset(0)
             .setSize(size);
         commandBuffer.copyBuffer(sourceBuffer, destinationBuffer, copyRegion);
-        commandBuffer.end();
-
-        vk::CommandBuffer tmpCommandBuffers[] = {commandBuffer};
-
-        vk::SubmitInfo submitInfo{};
-        submitInfo
-            .setCommandBufferCount(1)
-            .setCommandBuffers(tmpCommandBuffers);
-
-        _graphicsQueue->submit(submitInfo, VK_NULL_HANDLE);
-        _graphicsQueue->waitIdle();
+       });
     }
 
     void VulkanRenderer::createVertexBuffers()
     {
         vk::DeviceSize bufferSize = sizeof(_mesh.vertices[0]) * _mesh.vertices.size();
-        Buffer stagingBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-        stagingBuffer.mapMemory(0, bufferSize, [&](void *memory)
+        auto stagingBuffer = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        stagingBuffer->mapMemory(0, bufferSize, [&](void *memory)
                                 { memcpy(memory, _mesh.vertices.data(), (size_t)bufferSize); });
         _vertexBuffer = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
-        copyBuffer(stagingBuffer.getVkBuffer(), _vertexBuffer->getVkBuffer(), bufferSize);
-        /*
-        vk::raii::Buffer stagingBuffer = VK_NULL_HANDLE;
-        vk::raii::DeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
-
-        std::tie(stagingBuffer, stagingBufferMemory) = constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-
-        void *data = stagingBufferMemory.mapMemory(0, bufferSize);
-        memcpy(data, _mesh.vertices.data(), (size_t)bufferSize);
-        stagingBufferMemory.unmapMemory();
-
-        vk::raii::Buffer vertexBuffer = VK_NULL_HANDLE;
-        vk::raii::DeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
-        std::tie(vertexBuffer, vertexBufferMemory) = constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
-        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
-
-        _vertexBuffer = std::make_unique<vk::raii::Buffer>(std::move(vertexBuffer));
-        _vertexBufferMemory = std::make_unique<vk::raii::DeviceMemory>(std::move(vertexBufferMemory));
-        */
+        queueCommand<CopyBufferCommand>(CommandType::COPY_BUFFER, std::move(stagingBuffer), *_vertexBuffer.get(), bufferSize);
     }
 
     void VulkanRenderer::createIndexBuffers()
     {
         vk::DeviceSize bufferSize = sizeof(_mesh.indices[0]) * _mesh.indices.size();
-        Buffer stagingBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-        stagingBuffer.mapMemory(0, bufferSize, [&](void *memory)
+        auto stagingBuffer = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        stagingBuffer->mapMemory(0, bufferSize, [&](void *memory)
                                 { memcpy(memory, _mesh.indices.data(), (size_t)bufferSize); });
         _indexBuffer = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
-        copyBuffer(stagingBuffer.getVkBuffer(), _indexBuffer->getVkBuffer(), bufferSize);
-
-        /*
-
-        vk::DeviceSize bufferSize = sizeof(_mesh.indices[0]) * _mesh.indices.size();
-        vk::raii::Buffer stagingBuffer = VK_NULL_HANDLE;
-        vk::raii::DeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
-
-        std::tie(stagingBuffer, stagingBufferMemory) = constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-
-        void *data = stagingBufferMemory.mapMemory(0, bufferSize);
-        memcpy(data, _mesh.indices.data(), (size_t)bufferSize);
-        stagingBufferMemory.unmapMemory();
-
-        vk::raii::Buffer indexBuffer = VK_NULL_HANDLE;
-        vk::raii::DeviceMemory indexBufferMemory = VK_NULL_HANDLE;
-        std::tie(indexBuffer, indexBufferMemory) = constructors::createBuffer(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
-        copyBuffer(stagingBuffer, indexBuffer, bufferSize);
-
-        _indexBuffer = std::make_unique<vk::raii::Buffer>(std::move(indexBuffer));
-        _indexBufferMemory = std::make_unique<vk::raii::DeviceMemory>(std::move(indexBufferMemory));
-        */
+        
+        queueCommand<CopyBufferCommand>(CommandType::COPY_BUFFER, std::move(stagingBuffer), *_indexBuffer.get(), bufferSize);
     }
 
     void VulkanRenderer::createUniformBuffers()
@@ -734,5 +663,24 @@ namespace lava::rendering
         _requiresResize = false;
         recreateSwapChain(screenSize);
         _renderpass->recreateFramebuffers(*_renderContext.get());
+    }
+
+    void VulkanRenderer::preFrame()
+    {
+        while(!_commandQueue.empty())
+        {
+            Command c = _commandQueue.front();
+
+            switch(c.type)
+            {
+                case CommandType::COPY_BUFFER:
+                    CopyBufferCommand* copyCommand = (CopyBufferCommand*)(c.pCommand);
+                    copyBuffer(copyCommand->sourceBuffer->getVkBuffer(), copyCommand->destinationBuffer.getVkBuffer(), copyCommand->size);
+                    delete copyCommand;
+                    break;
+            }
+
+            _commandQueue.pop();
+        }
     }
 }

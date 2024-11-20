@@ -3,6 +3,7 @@
 #include <memory>
 #include <optional>
 #include <vulkan/vulkan_raii.hpp>
+#include <queue>
 #include "lava/rendering/data/vertex.hpp"
 #include "lava/rendering/vulkan-renderer.hpp"
 #include "lava/rendering/graphics-pipeline.hpp"
@@ -13,14 +14,15 @@
 #include "lava/rendering/renderpass.hpp"
 #include "lava/rendering/render-context.hpp"
 #include "lava/rendering/data/texture.hpp"
+#include "lava/rendering/command.hpp"
 namespace lava::rendering
 {
     class VulkanRenderer
     {
     public:
         VulkanRenderer(const ScreenSize& screenSize, HWND windowHandle);
-        ~VulkanRenderer();
         
+        void preFrame();
         bool render();
 
         void waitUntilIdle();
@@ -28,14 +30,22 @@ namespace lava::rendering
         void requireResize();
 
     private:
-        void cleanupSwapChain();
+        template< class _Ty, class... _Types, std::enable_if_t<!std::is_array_v<_Ty>, int> = 0>
+        constexpr void queueCommand(CommandType type, _Types&&... args )
+        {
+            _commandQueue.push({
+                .type = type,
+                .pCommand = new _Ty(std::forward<_Types>(args)...)
+            });
+        }
+        // void cleanupSwapChain();
         void recreateSwapChain(const ScreenSize& screenSize);
         void createVertexBuffers();
         void createIndexBuffers();
         void createUniformBuffers();
         void createDescriptorPool();
         void createDescriptorSets();
-        void copyBuffer(const vk::raii::Buffer& sourceBuffer, const vk::raii::Buffer& destinationBuffer, vk::DeviceSize size);
+        void copyBuffer(const vk::Buffer& sourceBuffer, const vk::Buffer& destinationBuffer, vk::DeviceSize size);
         void createCommandBuffer();
         void createSyncObjects();
         void createDescriptorSetLayout();
@@ -56,8 +66,8 @@ namespace lava::rendering
         std::unique_ptr<vk::raii::ImageView> createTextureImageView();
         void createTextureSampler();
 
-        const uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
+        const uint32_t MAX_FRAMES_IN_FLIGHT = 2;
         vk::raii::Instance _vulkanInstance;
         std::unique_ptr<vk::raii::SurfaceKHR> _surface;
         std::unique_ptr<vk::raii::DebugUtilsMessengerEXT> _debugMessenger;
@@ -111,6 +121,8 @@ namespace lava::rendering
         //std::vector<vk::raii::ImageView> _swapchainImageViews;
         //std::vector<vk::raii::Framebuffer> _swapchainFrameBuffers;
     
+        std::queue<Command> _commandQueue;
+
         bool _requiresResize = false;
         uint32_t _currentFrame = 0;
 

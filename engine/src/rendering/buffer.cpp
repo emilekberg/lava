@@ -22,12 +22,13 @@ namespace lava::rendering
         _vkDeviceMemory = vk::raii::DeviceMemory(device, allocInfo);
         _vkBuffer.bindMemory(_vkDeviceMemory, 0);
     }
-    Buffer::~Buffer()
+    /*
+    Buffer::Buffer(Buffer&& other) 
     {
 
     }
-
-    vk::raii::Buffer& Buffer::getVkBuffer()
+    */
+    const vk::raii::Buffer& Buffer::getVkBuffer() const
     {
         return _vkBuffer;
     }

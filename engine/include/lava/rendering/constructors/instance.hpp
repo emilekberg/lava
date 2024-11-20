@@ -72,7 +72,7 @@ namespace lava::rendering::constructors
 
         auto requiredExtensions = getRequiredExtensions(!validationLayers.empty());
 
-        createInfo.flags |= vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
+        // createInfo.flags |= vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
 
         createInfo.enabledExtensionCount = static_cast<uint32_t>(requiredExtensions.size());
         createInfo.ppEnabledExtensionNames = requiredExtensions.data();

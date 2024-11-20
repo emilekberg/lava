@@ -52,6 +52,7 @@ namespace lava
                 _vulkanRenderer.resize(screenSize);
             }
             _window->pollEvents();
+            _vulkanRenderer.preFrame();
             requiresResize = render();
         }
         _vulkanRenderer.waitUntilIdle();
