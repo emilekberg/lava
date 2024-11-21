@@ -24,25 +24,6 @@ namespace lava::rendering
                                                                                       _deviceExtensions({VK_KHR_SWAPCHAIN_EXTENSION_NAME}),
                                                                                       _vulkanInstance(VK_NULL_HANDLE)
     {
-        const std::vector<data::Vertex> vertices = {
-            {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-            {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-            {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-            {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-
-            {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-            {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-            {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-            {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
-        };
-
-        const std::vector<uint32_t> indices = {
-            0, 1, 2, 2, 3, 0,
-            4, 5, 6, 6, 7, 4
-        };
-        // _mesh = data::Mesh(vertices, indices);
-        _mesh = lava::resourceloader::loadMesh("./build/mesh/viking_room.obj");
-        // _mesh = lava::resourceloader::loadMesh("./build/mesh/cube.obj");
 
         _vulkanInstance = constructors::createInstance(_validationLayers);
         if (!_validationLayers.empty())
@@ -70,13 +51,31 @@ namespace lava::rendering
         _imageView = createTextureImageView();
         createTextureSampler();
 
-        createVertexBuffers();
-        createIndexBuffers();
+        // createVertexBuffers();
+        // createIndexBuffers();
         createUniformBuffers();
         createDescriptorPool();
         createDescriptorSets();
         createCommandBuffer();
         createSyncObjects();
+
+        const std::vector<data::Vertex> vertices = {
+            {{-0.5f, -0.5f, -1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+            {{0.5f, -0.5f, -1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+            {{0.5f, 0.5f, -1.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+            {{-0.5f, 0.5f, -1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+
+            {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+            {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+            {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+            {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
+
+        const std::vector<uint32_t> indices = {
+            0, 1, 2, 2, 3, 0,
+            4, 5, 6, 6, 7, 4};
+        _meshes.push_back(createMesh(vertices, indices));
+        auto mesh = lava::resourceloader::loadMesh("./build/mesh/viking_room.obj");
+        _meshes.push_back(createMesh(mesh.vertices, mesh.indices));
     }
 
     void VulkanRenderer::recreateSwapChain(const ScreenSize &screenSize)
@@ -88,37 +87,15 @@ namespace lava::rendering
 
     void VulkanRenderer::copyBuffer(const vk::Buffer &sourceBuffer, const vk::Buffer &destinationBuffer, vk::DeviceSize size)
     {
-       beginSingleTimeCommands([&](const vk::raii::CommandBuffer& commandBuffer)
-       {
+        beginSingleTimeCommands([&](const vk::raii::CommandBuffer &commandBuffer)
+                                {
         vk::BufferCopy copyRegion;
 
         copyRegion
             .setSrcOffset(0)
             .setDstOffset(0)
             .setSize(size);
-        commandBuffer.copyBuffer(sourceBuffer, destinationBuffer, copyRegion);
-       });
-    }
-
-    void VulkanRenderer::createVertexBuffers()
-    {
-        vk::DeviceSize bufferSize = sizeof(_mesh.vertices[0]) * _mesh.vertices.size();
-        auto stagingBuffer = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-        stagingBuffer->mapMemory(0, bufferSize, [&](void *memory)
-                                { memcpy(memory, _mesh.vertices.data(), (size_t)bufferSize); });
-        _vertexBuffer = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
-        queueCommand<CopyBufferCommand>(CommandType::COPY_BUFFER, std::move(stagingBuffer), *_vertexBuffer.get(), bufferSize);
-    }
-
-    void VulkanRenderer::createIndexBuffers()
-    {
-        vk::DeviceSize bufferSize = sizeof(_mesh.indices[0]) * _mesh.indices.size();
-        auto stagingBuffer = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-        stagingBuffer->mapMemory(0, bufferSize, [&](void *memory)
-                                { memcpy(memory, _mesh.indices.data(), (size_t)bufferSize); });
-        _indexBuffer = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), bufferSize, vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
-        
-        queueCommand<CopyBufferCommand>(CommandType::COPY_BUFFER, std::move(stagingBuffer), *_indexBuffer.get(), bufferSize);
+        commandBuffer.copyBuffer(sourceBuffer, destinationBuffer, copyRegion); });
     }
 
     void VulkanRenderer::createUniformBuffers()
@@ -438,21 +415,6 @@ namespace lava::rendering
 
         return std::make_tuple(std::move(textureImage), std::move(textureMemory));
     }
-    std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> VulkanRenderer::createTextureImage(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice)
-    {
-        int width, height;
-        std::unique_ptr<rendering::Buffer> buffer = resourceloader::loadImageToStagingBuffer("./build/mesh/viking_room.png", device, physicalDevice, &width, &height);
-        std::unique_ptr<vk::raii::Image> image;
-        std::unique_ptr<vk::raii::DeviceMemory> imageMemory;
-        std::tie(image, imageMemory) = createImage(device, physicalDevice, width, height, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal);
-
-        transitionImageLayout(*image.get(), vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
-        copyBufferToImage(buffer->getVkBuffer(), *image.get(), static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-        transitionImageLayout(*image.get(), vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
-
-        return std::make_tuple(std::move(image), std::move(imageMemory));
-    }
-
     std::unique_ptr<data::Texture> VulkanRenderer::createTexture(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice)
     {
         int width;
@@ -460,11 +422,33 @@ namespace lava::rendering
         std::unique_ptr<Buffer> buffer = resourceloader::loadImageToStagingBuffer("./build/mesh/viking_room.png", device, physicalDevice, &width, &height);
         std::unique_ptr<data::Texture> texture = std::make_unique<data::Texture>(device, physicalDevice, width, height, vk::Format::eR8G8B8A8Srgb, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled);
 
-        transitionImageLayout(texture->getVkImage(), texture->getFormat(), vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
-        copyBufferToImage(buffer->getVkBuffer(), texture->getVkImage(), static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-        transitionImageLayout(texture->getVkImage(), texture->getFormat(), vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+        queueCommand<TransitionImageLayoutCommand>(CommandType::TRANSITION_IMAGE_LAYOUT, texture->getVkImage(), texture->getFormat(), vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+        queueCommand<CopyBufferToImageCommand>(CommandType::COPY_IMAGE_TO_BUFFER, std::move(buffer), texture->getVkImage(), static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+        queueCommand<TransitionImageLayoutCommand>(CommandType::TRANSITION_IMAGE_LAYOUT, texture->getVkImage(), texture->getFormat(), vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
 
         return texture;
+    }
+
+    std::unique_ptr<data::VkMesh> VulkanRenderer::createMesh(const std::vector<data::Vertex> vertices, const std::vector<uint32_t> indices)
+    {
+        auto mesh = std::make_unique<data::VkMesh>(*_device.get(), *_physicalDevice.get(), vertices, indices);
+
+        vk::DeviceSize indexSize = sizeof(indices[0]) * indices.size();
+        std::unique_ptr<Buffer> stagingBufferIndex = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), indexSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        stagingBufferIndex->mapMemory(0, indexSize, [&](void *memory)
+                                      { memcpy(memory, indices.data(), (size_t)indexSize); });
+        // copyBuffer(stagingBuffer.getVkBuffer(), _indexBuffer.getVkBuffer(), indexSize);
+
+        vk::DeviceSize vertexSize = sizeof(vertices[0]) * vertices.size();
+        std::unique_ptr<Buffer> stagingBufferVertex = std::make_unique<Buffer>(*_device.get(), *_physicalDevice.get(), vertexSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        stagingBufferVertex->mapMemory(0, vertexSize, [&](void *memory)
+                                       { memcpy(memory, vertices.data(), (size_t)vertexSize); });
+        // copyBuffer(stagingBuffer.getVkBuffer(), _indexBuffer.getVkBuffer(), indexSize);
+
+        queueCommand<CopyBufferCommand>(CommandType::COPY_BUFFER, std::move(stagingBufferVertex), mesh->getVertexBuffer(), vertexSize);
+        queueCommand<CopyBufferCommand>(CommandType::COPY_BUFFER, std::move(stagingBufferIndex), mesh->getIndexBuffer(), indexSize);
+
+        return mesh;
     }
 
     void VulkanRenderer::createDepthResource()
@@ -626,14 +610,17 @@ namespace lava::rendering
             scissor.setOffset({0, 0})
                 .setExtent(_renderContext->getExtent());
             commandBuffer.setScissor(0, scissor);
+            for (size_t i = 0; i < _meshes.size(); i++)
+            {
+                const data::VkMesh &mesh = *_meshes.at(i).get();
+                vk::Buffer vertexBuffers[] = {mesh.getVertexBuffer().getVkBuffer()};
+                vk::DeviceSize offsets[] = {0};
+                commandBuffer.bindVertexBuffers(0, vertexBuffers, offsets);
+                commandBuffer.bindIndexBuffer(mesh.getIndexBuffer().getVkBuffer(), {0}, vk::IndexType::eUint32);
 
-            vk::Buffer vertexBuffers[] = {_vertexBuffer->getVkBuffer()};
-            vk::DeviceSize offsets[] = {0};
-            commandBuffer.bindVertexBuffers(0, vertexBuffers, offsets);
-            commandBuffer.bindIndexBuffer(_indexBuffer->getVkBuffer(), {0}, vk::IndexType::eUint32);
-
-            commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, _graphicsPipeline->getVkPipelineLayout(), 0, {_descriptorSets->at(_currentFrame)}, nullptr);
-            commandBuffer.drawIndexed(static_cast<uint32_t>(_mesh.indices.size()), 1, 0, 0, 0);
+                commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, _graphicsPipeline->getVkPipelineLayout(), 0, {_descriptorSets->at(_currentFrame)}, nullptr);
+                commandBuffer.drawIndexed(mesh.getNumIndices(), 1, 0, 0, 0);
+            }
         }
         _renderpass->end(commandBuffer);
         commandBuffer.end();
@@ -667,17 +654,34 @@ namespace lava::rendering
 
     void VulkanRenderer::preFrame()
     {
-        while(!_commandQueue.empty())
+        while (!_commandQueue.empty())
         {
             Command c = _commandQueue.front();
 
-            switch(c.type)
+            switch (c.type)
             {
-                case CommandType::COPY_BUFFER:
-                    CopyBufferCommand* copyCommand = (CopyBufferCommand*)(c.pCommand);
-                    copyBuffer(copyCommand->sourceBuffer->getVkBuffer(), copyCommand->destinationBuffer.getVkBuffer(), copyCommand->size);
-                    delete copyCommand;
-                    break;
+            case CommandType::COPY_BUFFER:
+            {
+                CopyBufferCommand *copyCommand = (CopyBufferCommand *)(c.pCommand);
+                copyBuffer(copyCommand->sourceBuffer->getVkBuffer(), copyCommand->destinationBuffer.getVkBuffer(), copyCommand->size);
+                delete copyCommand;
+            }
+            break;
+
+            case CommandType::COPY_IMAGE_TO_BUFFER:
+            {
+                CopyBufferToImageCommand *copyImageCommand = (CopyBufferToImageCommand *)(c.pCommand);
+                copyBufferToImage(copyImageCommand->sourceBuffer->getVkBuffer(), copyImageCommand->destinationImage, copyImageCommand->width, copyImageCommand->height);
+                delete copyImageCommand;
+            }
+            break;
+            case CommandType::TRANSITION_IMAGE_LAYOUT:
+            {
+                TransitionImageLayoutCommand *transitionImageLayoutCommand = (TransitionImageLayoutCommand *)(c.pCommand);
+                transitionImageLayout(transitionImageLayoutCommand->image, transitionImageLayoutCommand->format, transitionImageLayoutCommand->oldLayout, transitionImageLayoutCommand->newLayout);
+                delete transitionImageLayoutCommand;
+            }
+            break;
             }
 
             _commandQueue.pop();

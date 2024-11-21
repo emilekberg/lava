@@ -9,35 +9,45 @@ namespace lava::rendering
         NONE,
         COPY_IMAGE_TO_BUFFER,
         COPY_BUFFER,
-        TRANSITION,
+        TRANSITION_IMAGE_LAYOUT,
     };
 
     struct Command
     {
         CommandType type;
-        void* pCommand;
+        void *pCommand;
     };
-    class CopyImageToBufferCommand
+    class CopyBufferToImageCommand
     {
-        vk::raii::Buffer& sourceBuffer;
-        vk::raii::Image& destinationImage;
+    public:
+        CopyBufferToImageCommand(std::unique_ptr<Buffer> sourceBuffer, const vk::raii::Image& image, uint32_t width, uint32_t height) 
+        : sourceBuffer(std::move(sourceBuffer)), destinationImage(std::move(image)), width(width), height(height) 
+        {}
+        std::unique_ptr<Buffer> sourceBuffer;
+        const vk::raii::Image& destinationImage;
         uint32_t width;
         uint32_t height;
     };
     class CopyBufferCommand
     {
     public:
-        CopyBufferCommand(std::unique_ptr<Buffer> sourceBuffer, const Buffer& destinationBuffer, vk::DeviceSize size)
+        CopyBufferCommand(std::unique_ptr<Buffer> sourceBuffer, const Buffer &destinationBuffer, vk::DeviceSize size)
             : sourceBuffer(std::move(sourceBuffer)), destinationBuffer(std::move(destinationBuffer)), size(size)
-        {}
+        {
+        }
         std::unique_ptr<Buffer> sourceBuffer;
-        const Buffer& destinationBuffer;
+        const Buffer &destinationBuffer;
         vk::DeviceSize size;
     };
-    struct CopyBufferCommand2
+    class TransitionImageLayoutCommand
     {
-        const Buffer& sourceBuffer;
-        const Buffer& destinationBuffer;
-        vk::DeviceSize size;
+    public:
+        TransitionImageLayoutCommand(const vk::raii::Image &image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)
+        : image(std::move(image)), format(format), oldLayout(oldLayout), newLayout(newLayout)
+        {}
+        const vk::raii::Image &image;
+        vk::Format format;
+        vk::ImageLayout oldLayout;
+        vk::ImageLayout newLayout;
     };
 }

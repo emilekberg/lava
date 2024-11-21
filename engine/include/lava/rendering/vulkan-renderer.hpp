@@ -15,6 +15,7 @@
 #include "lava/rendering/render-context.hpp"
 #include "lava/rendering/data/texture.hpp"
 #include "lava/rendering/command.hpp"
+#include "lava/rendering/data/vkMesh.hpp"
 namespace lava::rendering
 {
     class VulkanRenderer
@@ -51,7 +52,6 @@ namespace lava::rendering
         void createDescriptorSetLayout();
         void beginSingleTimeCommands(std::function<void(const vk::raii::CommandBuffer&)> callback);
         void endSingleTimeCommands(const vk::raii::CommandBuffer& commandBuffer);
-        // void copyBuffer2(const vk::raii::Buffer& sourceBuffer, const vk::raii::Buffer& destinationBuffer, vk::DeviceSize size);
         void transitionImageLayout(const vk::Image& image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
         void recordCommandBuffer(const vk::raii::CommandBuffer &commandBuffer, uint32_t imageIndex);
         void copyBufferToImage(const vk::raii::Buffer& buffer, const vk::raii::Image& image, uint32_t width, uint32_t height);
@@ -60,9 +60,8 @@ namespace lava::rendering
         void createDepthResource();
 
         std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> createImage(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice, uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties);
-        std::tuple<std::unique_ptr<vk::raii::Image>, std::unique_ptr<vk::raii::DeviceMemory>> createTextureImage(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice);
         std::unique_ptr<data::Texture> createTexture(const vk::raii::Device &device, const vk::raii::PhysicalDevice &physicalDevice);
-
+        std::unique_ptr<data::VkMesh> createMesh(const std::vector<data::Vertex> vertices, const std::vector<uint32_t> indices);
         std::unique_ptr<vk::raii::ImageView> createTextureImageView();
         void createTextureSampler();
 
@@ -81,7 +80,6 @@ namespace lava::rendering
         std::vector<vk::raii::Semaphore> _imageAvailableSemaphore;
         std::vector<vk::raii::Semaphore> _renderFinishedSemaphore;
         
-        // std::shared_ptr<vk::raii::RenderPass> _renderpass;
         std::unique_ptr<vk::raii::DescriptorSetLayout> _descriptorSetLayout;
         std::unique_ptr<rendering::GraphicsPipeline> _graphicsPipeline;
         
@@ -104,28 +102,18 @@ namespace lava::rendering
         std::vector<const char *> _deviceExtensions;
 
 
-
-        // std::unique_ptr<vk::raii::Image> _image;
-        // std::unique_ptr<vk::raii::DeviceMemory> _imageMemory;
         std::unique_ptr<lava::rendering::data::Texture> _texture;
         std::unique_ptr<vk::raii::ImageView> _imageView;
         std::unique_ptr<vk::raii::Sampler> _sampler;
        
         std::unique_ptr<lava::rendering::data::Texture> _depthImage;
         std::unique_ptr<vk::raii::ImageView> _depthImageView; 
-        // vk::Format _swapchainImageFormat;
-        // vk::Extent2D _swapchainExtent;
-
-        //std::unique_ptr<vk::raii::SwapchainKHR> _swapchain;
-        //std::vector<vk::Image> _swapchainImages;
-        //std::vector<vk::raii::ImageView> _swapchainImageViews;
-        //std::vector<vk::raii::Framebuffer> _swapchainFrameBuffers;
     
         std::queue<Command> _commandQueue;
 
         bool _requiresResize = false;
         uint32_t _currentFrame = 0;
 
-        rendering::data::Mesh _mesh;
+        std::vector<std::unique_ptr<rendering::data::VkMesh>> _meshes;
     };
 }
