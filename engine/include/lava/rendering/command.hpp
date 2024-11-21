@@ -2,6 +2,7 @@
 #include <vulkan/vulkan_raii.hpp>
 #include "lava/rendering/buffer.hpp"
 #include <memory>
+#include <any>
 namespace lava::rendering
 {
     enum CommandType
@@ -15,7 +16,13 @@ namespace lava::rendering
     struct Command
     {
         CommandType type;
-        void *pCommand;
+        std::any data;
+        
+        template<class T>
+        std::shared_ptr<T> getData()
+        {
+            return std::any_cast<std::shared_ptr<T>>(data);
+        }
     };
     class CopyBufferToImageCommand
     {

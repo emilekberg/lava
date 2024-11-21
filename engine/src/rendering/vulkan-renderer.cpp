@@ -662,24 +662,21 @@ namespace lava::rendering
             {
             case CommandType::COPY_BUFFER:
             {
-                CopyBufferCommand *copyCommand = (CopyBufferCommand *)(c.pCommand);
-                copyBuffer(copyCommand->sourceBuffer->getVkBuffer(), copyCommand->destinationBuffer.getVkBuffer(), copyCommand->size);
-                delete copyCommand;
+                auto data = c.getData<CopyBufferCommand>();
+                copyBuffer(data->sourceBuffer->getVkBuffer(), data->destinationBuffer.getVkBuffer(), data->size);
             }
             break;
 
             case CommandType::COPY_IMAGE_TO_BUFFER:
             {
-                CopyBufferToImageCommand *copyImageCommand = (CopyBufferToImageCommand *)(c.pCommand);
-                copyBufferToImage(copyImageCommand->sourceBuffer->getVkBuffer(), copyImageCommand->destinationImage, copyImageCommand->width, copyImageCommand->height);
-                delete copyImageCommand;
+                auto data = c.getData<CopyBufferToImageCommand>();
+                copyBufferToImage(data->sourceBuffer->getVkBuffer(), data->destinationImage, data->width, data->height);
             }
             break;
             case CommandType::TRANSITION_IMAGE_LAYOUT:
             {
-                TransitionImageLayoutCommand *transitionImageLayoutCommand = (TransitionImageLayoutCommand *)(c.pCommand);
-                transitionImageLayout(transitionImageLayoutCommand->image, transitionImageLayoutCommand->format, transitionImageLayoutCommand->oldLayout, transitionImageLayoutCommand->newLayout);
-                delete transitionImageLayoutCommand;
+                auto data = c.getData<TransitionImageLayoutCommand>();
+                transitionImageLayout(data->image, data->format, data->oldLayout, data->newLayout);
             }
             break;
             }

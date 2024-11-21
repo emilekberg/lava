@@ -36,13 +36,11 @@ namespace lava::rendering
         {
             _commandQueue.push({
                 .type = type,
-                .pCommand = new _Ty(std::forward<_Types>(args)...)
+                .data = std::make_shared<_Ty>(std::forward<_Types>(args)...),
             });
         }
         // void cleanupSwapChain();
         void recreateSwapChain(const ScreenSize& screenSize);
-        void createVertexBuffers();
-        void createIndexBuffers();
         void createUniformBuffers();
         void createDescriptorPool();
         void createDescriptorSets();

@@ -10,15 +10,15 @@ namespace lava::rendering::data
             VkMesh(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice, const Mesh& mesh);
             VkMesh(const vk::raii::Device& device, const vk::raii::PhysicalDevice& physicalDevice, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
 
-            const Buffer& getVertexBuffer() const
+            constexpr const Buffer& getVertexBuffer() const
             {
                 return _vertexBuffer;
             }
-            const Buffer& getIndexBuffer() const
+            constexpr const Buffer& getIndexBuffer() const
             {
                 return _indexBuffer;
             }
-            const uint32_t getNumIndices() const
+            constexpr const uint32_t getNumIndices() const
             {
                 return _numIndices;
             }
