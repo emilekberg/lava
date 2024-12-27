@@ -606,9 +606,8 @@ namespace lava::rendering
                 .setMaxDepth(1.0f);
             commandBuffer.setViewport(0, viewport);
 
-            vk::Rect2D scissor{};
-            scissor.setOffset({0, 0})
-                .setExtent(_renderContext->getExtent());
+            vk::Rect2D scissor({0,0}, _renderContext->getExtent());
+
             commandBuffer.setScissor(0, scissor);
             for (size_t i = 0; i < _meshes.size(); i++)
             {
