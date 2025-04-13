@@ -1,9 +1,5 @@
-cmake_minimum_required(VERSION 3.5)
-
-project(lava_engine C CXX)
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS on)
-set(SOURCES ${SOURCES})
+project(lava_engine CXX)
+# set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 
 # include_directories(lava_engine "src")
 file(GLOB_RECURSE LAVA_SOURCES CONFIGURE_DEPENDS "**/*.cpp")

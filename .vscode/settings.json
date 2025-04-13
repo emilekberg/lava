@@ -81,6 +81,8 @@
         "xtree": "cpp",
         "hash_map": "cpp",
         "filesystem": "cpp",
-        "queue": "cpp"
-    }
+        "queue": "cpp",
+        "bitset": "cpp"
+    },
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json"
 }

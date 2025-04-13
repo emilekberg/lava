@@ -1,5 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
-project(lava_tests C CXX)
+project(lava_tests CXX)
 
 include(FetchContent)
 include(CTest)
