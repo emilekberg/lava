@@ -6,10 +6,12 @@ namespace lava::memory {
             totalSize(reservedSize), 
             pData(new char[totalSize])
         {
+            std::cout << "created memory arena" << std::endl;
         }
 
         ~MemoryArena()
         {
+            std::cout << "destroyed memory arena" << std::endl;
             delete[] pData;
         }
 
