@@ -7,6 +7,10 @@ namespace lava::ecs
 {
     struct SceneArchetype
     {
+        SceneArchetype()
+        {
+            entitiesArchetypeLUT.fill(-1);
+        }
         EntityId createEntity()
         {
             if(!freeEntityIndices.empty())
@@ -128,8 +132,11 @@ namespace lava::ecs
             freeEntityIndices.push(entityIndex);
 
             size_t archetypeIndex = entitiesArchetypeLUT[entityIndex];
-            archetypes[archetypeIndex]->remove(id);
-            entitiesArchetypeLUT[entityIndex] = -1;
+            if(entitiesArchetypeLUT[entityIndex] != -1)
+            {
+                archetypes[archetypeIndex]->remove(id);
+                entitiesArchetypeLUT[entityIndex] = -1;
+            }
         }
 
         struct EntityDescriptor
@@ -138,7 +145,7 @@ namespace lava::ecs
             ComponentMask mask;
         };
         std::vector<std::unique_ptr<Archetype>> archetypes;
-        std::array<size_t, MAX_ENTITIES> entitiesArchetypeLUT;
+        std::array<size_t, MAX_ENTITIES> entitiesArchetypeLUT{};
         std::vector<EntityDescriptor> entities;
         std::queue<EntityIndex> freeEntityIndices;
         std::vector<std::function<void(SceneArchetype&)>> systems;

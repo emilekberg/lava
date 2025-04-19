@@ -13,23 +13,25 @@ namespace lava::ecs
         Archetype(ComponentMask mask)
             : componentMask(mask), 
             componentOffsets(0, 0), 
-            componentStorage(sizePerEntity * MAX_ENTITIES)
+            componentStorage(sizePerEntity * 10)
         {
             int numComponent = 0;
             size_t totalSize = 0;
             componentOffsets.resize(componentMask.count(), 0);
+            componentMemoryOffsets.push_back(0);
             for(size_t i = 0; i < mask.size(); i++)
             {
                 if (mask.test(i))
                 {
                     ComponentId componentId = static_cast<ComponentId>(i);
                     componentOffsets[numComponent++] = componentId;
-                    componentLUT[componentId] = numComponent;
+                    componentIndexLUT[componentId] = numComponent;
                     totalSize += ComponentManager::getInstance()->getSize(static_cast<ComponentId>(i));
-                    offsets.push_back(totalSize);
+                    componentMemoryOffsets.push_back(totalSize);
                 }
             }
             sizePerEntity = totalSize;
+            componentStorage.resize(sizePerEntity * 10);
         }
 
         bool hasEntities()
@@ -48,7 +50,7 @@ namespace lava::ecs
 
         void add(EntityId id)
         {
-            if(entityLUT.contains(id))
+            if(entityIdLUT.contains(id))
             {
                 return;
             }
@@ -56,33 +58,36 @@ namespace lava::ecs
             {
                 size_t index = freeEntityIndices.back();
                 freeEntityIndices.pop();
-                entityLUT[id] = index;
+                entityIdLUT[id] = index;
                 entityIds[index] = id;
             }
             else
             {
                 entityIds.push_back(id);
-                entityLUT[id] = entityIds.size()-1;
+                entityIdLUT[id] = entityIds.size()-1;
+                if(entityIds.size() * sizePerEntity > componentStorage.maxSize) {
+                    componentStorage.resize(sizePerEntity * entityIds.size() * 2);
+                }
             }
         }
 
         void remove(EntityId id)
         {
-            if(!entityLUT.contains(id))
+            if(!entityIdLUT.contains(id))
             {
                 return;
             }
-            freeEntityIndices.push(entityLUT[id]);
-            entityIds[entityLUT[id]] = INVALID_ENTITY;
-            entityLUT.erase(id);
+            freeEntityIndices.push(entityIdLUT[id]);
+            entityIds[entityIdLUT[id]] = INVALID_ENTITY;
+            entityIdLUT.erase(id);
         }
 
         void* get(EntityId id, ComponentId componentId)
         {
-            size_t entityOffset = entityLUT[id]; // need constant time lookup
-            size_t componentOffset = componentLUT[componentId]; // need constant time lookup
-            size_t memoryOffset = componentOffset > 0 ? offsets[componentOffset-1] : 0;
-            void* pData = componentStorage.get(entityOffset * sizePerEntity + memoryOffset);
+            size_t entityIndex = entityIdLUT[id]; // need constant time lookup
+            size_t componentIndex = componentIndexLUT[componentId]; // need constant time lookup
+            size_t componentMemoryOffset = componentMemoryOffsets[componentIndex];
+            void* pData = componentStorage.get(entityIndex * sizePerEntity + componentMemoryOffset);
             return pData;
         }
         template <typename T>
@@ -91,10 +96,10 @@ namespace lava::ecs
             ComponentId componentId = getComponentId<T>();
             return static_cast<T*>(get(id, componentId));
         }
-        std::unordered_map<EntityId, size_t> entityLUT;
-        std::unordered_map<ComponentId, size_t> componentLUT;
+        std::unordered_map<EntityId, size_t> entityIdLUT;
+        std::unordered_map<ComponentId, size_t> componentIndexLUT;
 
-        std::vector<size_t> offsets;
+        std::vector<size_t> componentMemoryOffsets;
         size_t sizePerEntity{0};
         std::vector<EntityId> entityIds;
         memory::MemoryArena componentStorage;

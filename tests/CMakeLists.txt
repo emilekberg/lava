@@ -17,6 +17,7 @@ FetchContent_MakeAvailable(googletest)
 
 add_executable(lava_tests 
     test.cpp
+    ecs.cpp
 )
 target_link_libraries(lava_tests
     gtest

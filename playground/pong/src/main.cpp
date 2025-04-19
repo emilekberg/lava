@@ -17,6 +17,7 @@ int main(int argc, char *argv[])
 
     lava::ecs::Scene scene;
     lava::ecs::SceneArchetype sceneArchetype;
+    sceneArchetype.systems.push_back(pong::movingSystem);
     
     auto id = sceneArchetype.createEntity();
     auto transform1 = sceneArchetype.addComponent<lava::ecs::Transform>(id);
@@ -30,14 +31,14 @@ int main(int argc, char *argv[])
     sceneArchetype.addComponent<lava::ecs::Transform>(id3);
     auto velocity2 = sceneArchetype.addComponent<lava::ecs::Velocity>(id3);
 
+    /*
     auto id4 = sceneArchetype.createEntity();
     sceneArchetype.addComponent<lava::ecs::Transform>(id4);
 
-    sceneArchetype.systems.push_back(pong::movingSystem);
 
     velocity1->velocity.x = 1;
     velocity2->velocity.y = 1;
-    
+    */
     
     std::cout << "PRINTING VALUES" << std::endl;
     for(lava::ecs::EntityId id : lava::ecs::SceneViewArchetype<lava::ecs::Transform>(sceneArchetype))
