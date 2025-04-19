@@ -9,7 +9,7 @@
 #include <lava/ecs/scene-view.hpp>
 #include "lava/ecs/scene-archetype.hpp"
 #include "lava/ecs/scene-view-archetype.hpp"
-
+#include "systems/moving-system.hpp"
 int s_componentCounter = 0;
 int main(int argc, char *argv[])
 {
@@ -26,7 +26,6 @@ int main(int argc, char *argv[])
     auto id2 = sceneArchetype.createEntity();
     sceneArchetype.addComponent<lava::ecs::Transform>(id2);
 
-    /*
     auto id3 = sceneArchetype.createEntity();
     sceneArchetype.addComponent<lava::ecs::Transform>(id3);
     auto velocity2 = sceneArchetype.addComponent<lava::ecs::Velocity>(id3);
@@ -34,9 +33,12 @@ int main(int argc, char *argv[])
     auto id4 = sceneArchetype.createEntity();
     sceneArchetype.addComponent<lava::ecs::Transform>(id4);
 
+    sceneArchetype.systems.push_back(pong::movingSystem);
+
     velocity1->velocity.x = 1;
     velocity2->velocity.y = 1;
-    */
+    
+    
     std::cout << "PRINTING VALUES" << std::endl;
     for(lava::ecs::EntityId id : lava::ecs::SceneViewArchetype<lava::ecs::Transform>(sceneArchetype))
     {
@@ -46,12 +48,9 @@ int main(int argc, char *argv[])
     }
 
     std::cout << "CALCULATING VALUES" << std::endl;
-    for(lava::ecs::EntityId id : lava::ecs::SceneViewArchetype<lava::ecs::Transform, lava::ecs::Velocity>(sceneArchetype))
+    for(auto system : sceneArchetype.systems)
     {
-        auto transform = sceneArchetype.getComponent<lava::ecs::Transform>(id);
-        auto velocity = sceneArchetype.getComponent<lava::ecs::Velocity>(id);
-
-        transform->position = transform->position + velocity->velocity;
+        system(sceneArchetype);
     }
 
     std::cout << "PRINTING VALUES" << std::endl;
@@ -62,7 +61,6 @@ int main(int argc, char *argv[])
         std::cout << "- transform: pos(" << transform->position.x << "," << transform->position.y << "," << transform->position.z << ")" << std::endl;
     }
     
-
     try
     {
         glfwInit();

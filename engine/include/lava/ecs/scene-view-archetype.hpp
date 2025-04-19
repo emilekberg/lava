@@ -30,7 +30,7 @@ namespace lava::ecs
             }
             EntityId operator*() const
             {
-                return pScene->archetypes[archetypeIndex]->entities[entityIndex];
+                return pScene->archetypes[archetypeIndex]->entityIds[entityIndex];
             }
 
             bool operator==(const Iterator& other) const
@@ -45,7 +45,7 @@ namespace lava::ecs
 
             bool isValidEntityIndex()
             {
-                return isEntityValid(pScene->archetypes[archetypeIndex]->entities[entityIndex]) && (all || pScene->archetypes[archetypeIndex]->hasMask(mask));
+                return isEntityValid(pScene->archetypes[archetypeIndex]->entityIds[entityIndex]) && (all || pScene->archetypes[archetypeIndex]->hasMask(mask));
             }
 
             bool isValidArchetypeIndex()
@@ -60,11 +60,11 @@ namespace lava::ecs
                     do
                     {
                         entityIndex++;
-                        if(entityIndex < pScene->archetypes[archetypeIndex]->entities.size() && isValidEntityIndex())
+                        if(entityIndex < pScene->archetypes[archetypeIndex]->entityIds.size() && isValidEntityIndex())
                         {
                             return *this;
                         }
-                    } while (entityIndex == pScene->archetypes[archetypeIndex]->entities.size());
+                    } while (entityIndex == pScene->archetypes[archetypeIndex]->entityIds.size());
                     
                     entityIndex = 0;
                     do
@@ -75,7 +75,7 @@ namespace lava::ecs
                     {
                         return *this;
                     }
-                } while (archetypeIndex < pScene->archetypes.size() && entityIndex < pScene->archetypes[archetypeIndex]->entities.size());
+                } while (archetypeIndex < pScene->archetypes.size() && entityIndex < pScene->archetypes[archetypeIndex]->entityIds.size());
                 return *this;
             }
 
@@ -99,11 +99,11 @@ namespace lava::ecs
                     firstArchetypeIndex++;
                 }
                 wasArchetypeValid = true;
-                while (firstEntityIndex < pScene->archetypes[firstArchetypeIndex]->entities.size() && !isEntityValid(pScene->archetypes[firstArchetypeIndex]->entities[firstEntityIndex]))
+                while (firstEntityIndex < pScene->archetypes[firstArchetypeIndex]->entityIds.size() && !isEntityValid(pScene->archetypes[firstArchetypeIndex]->entityIds[firstEntityIndex]))
                 {
                     firstEntityIndex++;
                 }
-                if(firstEntityIndex == pScene->archetypes[firstArchetypeIndex]->entities.size())
+                if(firstEntityIndex == pScene->archetypes[firstArchetypeIndex]->entityIds.size())
                 {
                     firstArchetypeIndex++;
                     wasArchetypeValid = false;

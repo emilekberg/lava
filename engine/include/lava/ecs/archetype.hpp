@@ -13,10 +13,10 @@ namespace lava::ecs
         Archetype(ComponentMask mask)
             : componentMask(mask), 
             componentOffsets(0, 0), 
-            sizePerEntity(getTotalSize(mask)),
             componentStorage(sizePerEntity * MAX_ENTITIES)
         {
             int numComponent = 0;
+            size_t totalSize = 0;
             componentOffsets.resize(componentMask.count(), 0);
             for(size_t i = 0; i < mask.size(); i++)
             {
@@ -25,33 +25,21 @@ namespace lava::ecs
                     ComponentId componentId = static_cast<ComponentId>(i);
                     componentOffsets[numComponent++] = componentId;
                     componentLUT[componentId] = numComponent;
+                    totalSize += ComponentManager::getInstance()->getSize(static_cast<ComponentId>(i));
+                    offsets.push_back(totalSize);
                 }
             }
+            sizePerEntity = totalSize;
         }
 
         bool hasEntities()
         {
-            return freeEntityIndices.size() != entities.size();
-        }
-
-        constexpr size_t getTotalSize(ComponentMask mask)
-        {
-            size_t size = 0;
-            for(size_t i = 0; i < mask.size(); i++)
-            {
-                if (mask.test(i))
-                {
-                    size += ComponentManager::getInstance()->getSize(static_cast<ComponentId>(i));
-                    offsets.push_back(size);
-                }
-            }
-            return size;
+            return freeEntityIndices.size() != entityIds.size();
         }
 
         bool hasMask(ComponentMask mask)
         {
-            bool res = mask == (mask & componentMask);
-            return res;
+            return mask == (mask & componentMask);
         }
         bool isMask(ComponentMask mask)
         {
@@ -69,12 +57,12 @@ namespace lava::ecs
                 size_t index = freeEntityIndices.back();
                 freeEntityIndices.pop();
                 entityLUT[id] = index;
-                entities[index] = id;
+                entityIds[index] = id;
             }
             else
             {
-                entities.push_back(id);
-                entityLUT[id] = entities.size()-1;
+                entityIds.push_back(id);
+                entityLUT[id] = entityIds.size()-1;
             }
         }
 
@@ -85,7 +73,7 @@ namespace lava::ecs
                 return;
             }
             freeEntityIndices.push(entityLUT[id]);
-            entities[entityLUT[id]] = INVALID_ENTITY;
+            entityIds[entityLUT[id]] = INVALID_ENTITY;
             entityLUT.erase(id);
         }
 
@@ -108,7 +96,7 @@ namespace lava::ecs
 
         std::vector<size_t> offsets;
         size_t sizePerEntity{0};
-        std::vector<EntityId> entities;
+        std::vector<EntityId> entityIds;
         memory::MemoryArena componentStorage;
         std::vector<ComponentId> componentOffsets;
         std::queue<size_t> freeEntityIndices;
