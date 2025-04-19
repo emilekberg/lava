@@ -12,11 +12,6 @@ namespace lava
         glfwSetWindowUserPointer(_window->getGLFWwindow(), this);
         _window->setResizeHandler(handleWindowResize);
         _window->activate();
-        _meshes = 
-        {
-            rendering::data::Mesh()
-        };
-
     }
     App::~App()
     {
@@ -35,6 +30,7 @@ namespace lava
 
     void App::run()
     {
+        // todo: implement fixed timestep and pass delta time.
         bool requiresResize = false;
         while (!_window->shouldClose())
         {
@@ -60,6 +56,10 @@ namespace lava
 
     void App::update()
     {
+        for(const auto& system : _systems)
+        {
+            system(_scene);
+        }
     }
 
     bool App::render()

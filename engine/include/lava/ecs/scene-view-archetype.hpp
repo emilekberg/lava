@@ -99,6 +99,7 @@ namespace lava::ecs
                     firstArchetypeIndex++;
                 }
                 wasArchetypeValid = true;
+                if (firstArchetypeIndex >= pScene->archetypes.size()) break;
                 while (firstEntityIndex < pScene->archetypes[firstArchetypeIndex]->entityIds.size() && !isEntityValid(pScene->archetypes[firstArchetypeIndex]->entityIds[firstEntityIndex]))
                 {
                     firstEntityIndex++;

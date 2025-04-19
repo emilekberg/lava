@@ -1,6 +1,8 @@
 #pragma once
 #include <vector>
 #include <functional>
+#include <iostream>
+#include <memory>
 #include "types.hpp"
 #include "archetype.hpp"
 namespace lava::ecs
