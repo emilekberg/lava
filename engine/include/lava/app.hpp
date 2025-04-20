@@ -9,6 +9,7 @@
 #include "lava/rendering/data/mesh.hpp"
 #include "lava/ecs/scene-archetype.hpp"
 #include "lava/ecs/component.hpp"
+#include "lava/ecs/world.hpp"
 namespace lava
 {
     class App
@@ -20,14 +21,9 @@ namespace lava
         void update();
         bool render();
 
-        inline ecs::SceneArchetype& getActiveScene()
+        void setWorld(std::unique_ptr<lava::ecs::World> world)
         {
-            return _scene;
-        }
-        App& addEcsSystem(std::function<void(lava::ecs::SceneArchetype&)> system)
-        {
-            _systems.push_back(system);
-            return *this;
+            _world = std::move(world);
         }
 
     private:
@@ -36,8 +32,7 @@ namespace lava
         std::unique_ptr<core::Window> _window;
         static void handleWindowResize(GLFWwindow* window, int width, int height);
         rendering::VulkanRenderer _vulkanRenderer;
-        std::vector<std::function<void(lava::ecs::SceneArchetype&)>> _systems; 
-        ecs::SceneArchetype _scene;
+        std::unique_ptr<lava::ecs::World> _world;
     };
 
 }

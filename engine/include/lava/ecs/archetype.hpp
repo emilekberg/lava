@@ -26,7 +26,7 @@ namespace lava::ecs
                     ComponentId componentId = static_cast<ComponentId>(i);
                     componentOffsets[numComponent++] = componentId;
                     componentIndexLUT[componentId] = numComponent;
-                    totalSize += ComponentManager::getInstance()->getSize(static_cast<ComponentId>(i));
+                    totalSize += getComponentSize(static_cast<ComponentId>(i));
                     componentMemoryOffsets.push_back(totalSize);
                 }
             }

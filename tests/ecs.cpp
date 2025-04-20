@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 #include <lava/ecs/scene-archetype.hpp>
 
-int s_componentCounter = 0;
 TEST(ECS_Scene, CreateEntity)
 {
     lava::ecs::SceneArchetype scene;

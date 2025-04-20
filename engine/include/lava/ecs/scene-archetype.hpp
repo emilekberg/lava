@@ -25,7 +25,7 @@ namespace lava::ecs
                 return entities[newIndex].id;
             }
             EntityId id = createEntityId(static_cast<unsigned int>(entities.size()), 0);
-            entities.push_back({id, ComponentMask()});
+            entities.emplace_back(id, ComponentMask());
             std::cout << "created entity" << "index(" << getEntityIndex(id) << ") version(" << getEntityVersion(id) << ")." << std::endl;
             return entities.back().id;
         }
@@ -63,7 +63,7 @@ namespace lava::ecs
                     // copy component data to new archetype
                     auto pSrcData = archetypes[oldArchetypeId]->get(id, componentId);
                     auto pDstData = archetypes[newArchetypeId]->get(id, componentId);
-                    auto size = ComponentManager::getInstance()->getSize(componentId);
+                    auto size = getComponentSize(componentId);
                     memcpy_s(pDstData, size, pSrcData, size);
                 }
                 archetypes[oldArchetypeId]->remove(id);
@@ -113,7 +113,7 @@ namespace lava::ecs
                     // copy component data to new archetype
                     auto pSrcData = archetypes[oldArchetypeId]->get(id, componentId);
                     auto pDstData = archetypes[newArchetypeId]->get(id, componentId);
-                    auto size = ComponentManager::getInstance()->getSize(componentId);
+                    auto size = getComponentSize(componentId);
                     memcpy_s(pDstData, size, pSrcData, size);
                 }
                 entitiesArchetypeLUT[entityIndex] = newArchetypeId;

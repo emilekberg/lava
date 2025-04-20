@@ -56,10 +56,7 @@ namespace lava
 
     void App::update()
     {
-        for(const auto& system : _systems)
-        {
-            system(_scene);
-        }
+        _world->update();
     }
 
     bool App::render()

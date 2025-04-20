@@ -11,7 +11,6 @@
 #include <lava/ecs/scene-view-archetype.hpp>
 #include "systems/moving-system.hpp"
 #include "systems/render-system.hpp"
-int s_componentCounter = 0;
 int main(int argc, char *argv[])
 {
     fprintf(stdout, argv[0]);
@@ -20,12 +19,13 @@ int main(int argc, char *argv[])
     try
     {
         glfwInit();
+        auto world = std::make_unique<lava::ecs::World>();
         auto app = lava::App();
-        app
-            .addEcsSystem(pong::movingSystem)
-            .addEcsSystem(pong::renderSystem);
+        world
+            ->addSystem(pong::movingSystem)
+            ->addSystem(pong::renderSystem);
 
-        lava::ecs::SceneArchetype& scene = app.getActiveScene();
+        lava::ecs::SceneArchetype& scene = world->getActiveScene();
 
         auto id = scene.createEntity();
         auto transform1 = scene.addComponent<lava::ecs::Transform>(id);
@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
         scene.addComponent<lava::ecs::Transform>(id3);
         auto velocity2 = scene.addComponent<lava::ecs::Velocity>(id3);
         
-        
+        app.setWorld(std::move(world));
         app.run();
     }
     catch (const std::exception &e)
