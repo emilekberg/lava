@@ -8,38 +8,35 @@ extern int s_componentCounter;
 namespace lava::ecs
 {
 
-    constexpr int MAX_COMPONENTS = 32;
-    constexpr int MAX_ENTITIES = 64;
+    constexpr size_t MAX_COMPONENTS = 32;
+    constexpr size_t MAX_ENTITIES = 64;
     using EntityIndex = unsigned int;
     using EntityVersion = unsigned int;
     using EntityId = unsigned long long;
-    using ComponentId = int;
+    using ComponentId = size_t;
     using ComponentMask = std::bitset<MAX_COMPONENTS>;
 
-    struct ComponentManager
+    class ComponentManager
     {
-        static ComponentManager* getInstance() {
-            static ComponentManager* instance = new ComponentManager(); 
-            return instance;
-        }
-        
-        constexpr inline ComponentId getNextComponentId()
+    public:
+        template <typename T>
+        static ComponentId getNextComponentId()
         {
-            return componentIdCounter++;
+            static const ComponentId id = componentIdCounter++;
+            // static_assert(id < MAX_COMPONENTS, "Initialized too many components");
+            
+            sizes[id] = sizeof(T);
+
+            return id;
         } 
 
-        template <typename T>
-        constexpr inline void defineSize(ComponentId id)
-        {
-            sizes[id] = sizeof(T);
-        }
-
-        constexpr inline size_t getSize(ComponentId id) const
+        static size_t getSize(ComponentId id) 
         {
             return sizes[id];
         }
-        std::array<size_t, MAX_COMPONENTS> sizes;
-        ComponentId componentIdCounter;
+    private:
+        inline static std::array<size_t, MAX_COMPONENTS> sizes;
+        inline static ComponentId componentIdCounter = 0;
     };
     
     inline EntityId createEntityId(EntityIndex index, EntityVersion version)
@@ -59,36 +56,29 @@ namespace lava::ecs
 
     inline bool isEntityValid(EntityId id)
     {
-        return (id >> 32) != EntityIndex(-1);
+        return getEntityIndex(id) != EntityIndex(-1);
     }
 
 
     // can this be pure constexpr? would be nice with static assert on the id...
     static ComponentId s_componentIdCounter = 0;
     template <typename T>
-    constexpr inline ComponentId getComponentId()
+    static inline ComponentId getComponentId()
     {
+        return ComponentManager::getNextComponentId<T>();
+        /*
         static ComponentId s_componentId = s_componentIdCounter++;
         ComponentManager::getInstance()->defineSize<T>(s_componentId);
         // s_componentId is not compiletime... so this assert won't work ;(
         // static_assert(s_componentId < MAX_COMPONENTS, "number of declared components is greater than MAX_COMPONENTS");
         return s_componentId; 
-    }
-
-    template <typename T>
-    constexpr inline size_t defineComponentSize(size_t size = 0)
-    {
-        static size_t realSize = 0;
-        if(size > 0) {
-            realSize = size;
-        }
-        return realSize;
+        */
     }
 
     // can i do this compiletime?
-    constexpr inline size_t getComponentSize(ComponentId id)
+    static inline size_t getComponentSize(ComponentId id)
     {
-        return ComponentManager::getInstance()->getSize(id);
+        return ComponentManager::getSize(id);
     }
 
     #define INVALID_ENTITY createEntityId(EntityIndex(-1), 0);
