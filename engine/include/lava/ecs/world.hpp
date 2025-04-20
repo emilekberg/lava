@@ -2,13 +2,16 @@
 #include <unordered_set>
 #include <vector>
 #include <functional>
+#include <chrono>
 #include "./scene-archetype.hpp"
 
 namespace lava::ecs
 {
+    using chrono_ms = std::chrono::duration<float, std::milli>;
+    using EcsSystemCallback = std::function<void(SceneArchetype&, const float)>;
     struct World
     {
-        World* addSystem(const std::function<void(SceneArchetype&)>& system)
+        World* addSystem(const EcsSystemCallback& system)
         {
             systems.push_back(system);
             return this;
@@ -21,13 +24,18 @@ namespace lava::ecs
 
         void update()
         {
+            auto now = timer.now();
+            float deltaTime = std::chrono::duration_cast<chrono_ms>(now-lastFrame).count();
+            lastFrame = now;
             for(auto system : systems)
             {
-                system(getActiveScene());
+                system(getActiveScene(), deltaTime);
             }
         }
 
-        std::vector<std::function<void(SceneArchetype&)>> systems;
+        std::vector<EcsSystemCallback> systems;
         SceneArchetype _scene;
+        std::chrono::high_resolution_clock timer;
+        std::chrono::steady_clock::time_point lastFrame;
     };
 }

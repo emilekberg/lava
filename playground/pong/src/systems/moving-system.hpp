@@ -5,7 +5,7 @@ using lava::ecs::SceneViewArchetype;
 using lava::ecs::SceneArchetype;
 namespace pong
 {
-    void movingSystem(SceneArchetype& scene)
+    void movingSystem(SceneArchetype& scene, const float deltaTime)
     {
         for(lava::ecs::EntityId id : SceneViewArchetype<lava::ecs::Transform, lava::ecs::Velocity>(scene))
         {

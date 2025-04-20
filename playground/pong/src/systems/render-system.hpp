@@ -6,7 +6,7 @@ using lava::ecs::SceneViewArchetype;
 using lava::ecs::SceneArchetype;
 namespace pong
 {
-    void renderSystem(SceneArchetype& scene)
+    void renderSystem(SceneArchetype& scene, const float deltaTime)
     {
         for(lava::ecs::EntityId id : SceneViewArchetype<lava::ecs::Transform, pong::Mesh>(scene))
         {
