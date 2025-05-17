@@ -7,7 +7,7 @@
 #include "lava/core/window.hpp"
 #include "lava/rendering/vulkan-renderer.hpp"
 #include "lava/rendering/data/mesh.hpp"
-#include "lava/ecs/scene-archetype.hpp"
+#include "lava/ecs/scene.hpp"
 #include "lava/ecs/component.hpp"
 #include "lava/ecs/world.hpp"
 namespace lava

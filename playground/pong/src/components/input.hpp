@@ -1,6 +1,6 @@
 #pragma once
 
-namespace pong
+namespace pong::components
 {
     struct Input
     {

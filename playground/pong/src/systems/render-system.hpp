@@ -1,18 +1,34 @@
 #pragma once
-#include <lava/ecs/scene-view-archetype.hpp>
 #include <lava/ecs/component.hpp>
 #include "../components/mesh.hpp"
-using lava::ecs::SceneViewArchetype;
-using lava::ecs::SceneArchetype;
-namespace pong
+using lava::ecs::Scene;
+using lava::ecs::SceneView;
+using namespace pong::components;
+namespace pong::systems
 {
-    void renderSystem(SceneArchetype& scene, const float deltaTime)
+    struct RenderSystem
     {
-        for(lava::ecs::EntityId id : SceneViewArchetype<lava::ecs::Transform, pong::Mesh>(scene))
+        void tick(Scene &scene, const float deltaTime)
         {
-            auto transform = scene.getComponent<lava::ecs::Transform>(id);
-            auto mesh = scene.getComponent<pong::Mesh>(id);
+            // in here or in a camera system
+            // vkRenderer->setUBO(camera-getViewModel)
+            for (auto id : SceneView<lava::ecs::Transform, Mesh>(scene))
+            {
+                auto transform = scene.getComponent<lava::ecs::Transform>(id);
+                auto mesh = scene.getComponent<Mesh>(id);
 
+                // get mesh and material from resource manager
+                // get transform
+                // push data to renderqueue
+
+                // cmdBuffer = _vkRenderer->begin
+                // _vkRenderer
+                // _vkRenderer->render(cmdBuffer, mesh->model, mesh->material, transform);
+                // vk_renderer->end(cmdBuffer)
+            }
         }
+    };
+    void renderSystem(Scene &scene, const float deltaTime)
+    {
     }
 }

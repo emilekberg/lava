@@ -73,7 +73,7 @@ namespace lava::rendering
         const std::vector<uint32_t> indices = {
             0, 1, 2, 2, 3, 0,
             4, 5, 6, 6, 7, 4};
-        _meshes.push_back(createMesh(vertices, indices));
+        // _meshes.push_back(createMesh(vertices, indices));
         auto mesh = lava::resourceloader::loadMesh("./build/mesh/viking_room.obj");
         _meshes.push_back(createMesh(mesh.vertices, mesh.indices));
     }

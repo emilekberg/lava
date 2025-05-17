@@ -1,80 +1,144 @@
 #pragma once
-#include "lava/ecs/entity.hpp"
-#include <memory>
-#include <array>
 #include <vector>
-#include <queue>
-#include "lava/ecs/types.hpp"
-#include "lava/ecs/component-pool.hpp"
-
+#include <functional>
+#include <iostream>
+#include <memory>
+#include "types.hpp"
+#include "archetype.hpp"
 namespace lava::ecs
 {
     struct Scene
     {
+        Scene()
+        {
+            entitiesArchetypeLUT.fill(-1);
+        }
         EntityId createEntity()
         {
             if(!freeEntityIndices.empty())
             {
                 EntityIndex newIndex = freeEntityIndices.back();
                 freeEntityIndices.pop();
-                EntityId newId = createEntityId(newIndex, getEntityVersion(entities[newIndex].id));
-                entities[newIndex].id = newId;
+                EntityId id = createEntityId(newIndex, getEntityVersion(entities[newIndex].id));
+                entities[newIndex].id = id;
+                std::cout << "created entity" << "index(" << getEntityIndex(id) << ") version(" << getEntityVersion(id) << ")." << std::endl;
                 return entities[newIndex].id;
             }
-            auto id = createEntityId(static_cast<unsigned int>(entities.size()), 0);
-            entities.push_back({id, ComponentMask()});
+            EntityId id = createEntityId(static_cast<unsigned int>(entities.size()), 0);
+            entities.emplace_back(id, ComponentMask());
+            std::cout << "created entity" << "index(" << getEntityIndex(id) << ") version(" << getEntityVersion(id) << ")." << std::endl;
             return entities.back().id;
         }
         
         template <typename T>
         T* addComponent(EntityId id)
         {
-            ComponentId componentId = getComponentId<T>();
-            if (componentPools.size() <= componentId)
-            {
-                componentPools.resize(componentId + 1, nullptr);
-            }
-            if (componentPools[componentId] == nullptr)
-            {
-                componentPools[componentId] = new ComponentPool(sizeof(T));
-            }
             auto entityIndex = getEntityIndex(id);
-            T* pComponent = new (componentPools[componentId]->get(entityIndex)) T();
+            entities[entityIndex].mask.set(getComponentId<T>());
+            
+            size_t oldArchetypeId;
+            size_t newArchetypeId;
+            bool foundArchetype = false;
+            for(size_t i = 0; i < archetypes.size(); i++)
+            {
+                if (archetypes[i]->isMask(entities[entityIndex].mask))
+                {
+                    newArchetypeId = i;
+                    foundArchetype = true;
+                    break;   
+                }
+            }
+            if(!foundArchetype)
+            {
+                archetypes.push_back(std::make_unique<Archetype>(entities[entityIndex].mask));
+                newArchetypeId = archetypes.size()-1;
+            }
+            archetypes[newArchetypeId]->add(id);
+            
+            if(entities[entityIndex].mask.count() > 1)
+            {
+                oldArchetypeId = entitiesArchetypeLUT[entityIndex]; 
+                for (ComponentId componentId : (archetypes[oldArchetypeId])->componentOffsets)
+                {
+                    // copy component data to new archetype
+                    auto pSrcData = archetypes[oldArchetypeId]->get(id, componentId);
+                    auto pDstData = archetypes[newArchetypeId]->get(id, componentId);
+                    auto size = getComponentSize(componentId);
+                    memcpy_s(pDstData, size, pSrcData, size);
+                }
+                archetypes[oldArchetypeId]->remove(id);
+            }
+            entitiesArchetypeLUT[entityIndex] = newArchetypeId;
 
-            entities[entityIndex].mask.set(componentId);
+            T* pComponent = new (archetypes[newArchetypeId]->get<T>(id)) T(); 
             return pComponent;
         }
 
         template <typename T>
         T* getComponent(EntityId id)
         {
-            ComponentId componentId = getComponentId<T>();
-            if(!entities[getEntityIndex(id)].mask.test(componentId))
-                return nullptr;
-            
-            T* pComponent = static_cast<T*>(componentPools[componentId]->get(getEntityIndex(id)));
-            return pComponent;
-
+            return archetypes[entitiesArchetypeLUT[getEntityIndex(id)]]->get<T>(id);
         }
 
         template <typename T>
         void removeComponent(EntityId id)
         {
-            // ensures you're not accessing a removed entity
-            if(entities[getEntityIndex(id)].id != id)
+            auto entityIndex = getEntityIndex(id);
+            entities[entityIndex].mask.reset(getComponentId<T>());
+            size_t oldArchetypeId = entitiesArchetypeLUT[entityIndex];
+            if(entities[entityIndex].mask.count > 0) 
             {
-                return;
+
+                size_t newArchetypeId;
+                bool foundArchetype = false;
+                for(size_t i = 0; i < archetypes.size(); i++)
+                {
+                    if (archetypes[i]->isMask(entities[entityIndex].mask))
+                    {
+                        newArchetypeId = i;
+                        foundArchetype = true;
+                        break;   
+                    }
+                }
+                if(!foundArchetype)
+                {
+                    archetypes.push_back(std::make_unique<Archetype>(entities[entityIndex].mask));
+                    newArchetypeId = archetypes.size()-1;
+                }
+                archetypes[newArchetypeId]->add(id);
+                for (ComponentId componentId : (archetypes[oldArchetypeId])->componentOffsets)
+                {
+                    if(componentId == getComponentId<T>())
+                        continue;
+                    // copy component data to new archetype
+                    auto pSrcData = archetypes[oldArchetypeId]->get(id, componentId);
+                    auto pDstData = archetypes[newArchetypeId]->get(id, componentId);
+                    auto size = getComponentSize(componentId);
+                    memcpy_s(pDstData, size, pSrcData, size);
+                }
+                entitiesArchetypeLUT[entityIndex] = newArchetypeId;
             }
-            int componentId = getComponentId<T>();
-            entities[getEntityIndex(id)].mask.reset(componentId);
+            else
+            {
+                entitiesArchetypeLUT[entityIndex] = -1;
+            }
+            archetypes[oldArchetypeId]->remove(id);
         }
 
         void destroyEntity(EntityId id)
         {
-            EntityId newId = createEntityId(EntityIndex(-1), getEntityVersion(id) + 1 );
-            entities[getEntityIndex(id)].id = newId;
-            entities[getEntityIndex(id)].mask.reset();
-            freeEntityIndices.push(getEntityIndex(id));
+            EntityId newId = createEntityId(EntityIndex(-1), getEntityVersion(id)+1);
+            EntityIndex entityIndex = getEntityIndex(id);
+            entities[entityIndex].id = newId;
+            entities[entityIndex].mask.reset();
+            freeEntityIndices.push(entityIndex);
+
+            size_t archetypeIndex = entitiesArchetypeLUT[entityIndex];
+            if(entitiesArchetypeLUT[entityIndex] != -1)
+            {
+                archetypes[archetypeIndex]->remove(id);
+                entitiesArchetypeLUT[entityIndex] = -1;
+            }
         }
 
         struct EntityDescriptor
@@ -82,10 +146,11 @@ namespace lava::ecs
             EntityId id;
             ComponentMask mask;
         };
+        std::vector<std::unique_ptr<Archetype>> archetypes;
+        std::array<size_t, MAX_ENTITIES> entitiesArchetypeLUT{};
         std::vector<EntityDescriptor> entities;
         std::queue<EntityIndex> freeEntityIndices;
-        std::vector<ComponentPool*> componentPools; 
-        size_t componentCounter;
-    };
+        std::vector<std::function<void(Scene&)>> systems;
 
+    };
 }

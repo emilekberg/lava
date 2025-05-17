@@ -7,10 +7,11 @@
 #include <lava/ecs/scene.hpp>
 #include <lava/ecs/component.hpp>
 #include <lava/ecs/scene-view.hpp>
-#include <lava/ecs/scene-archetype.hpp>
-#include <lava/ecs/scene-view-archetype.hpp>
+#include <lava/ecs/scene.hpp>
+#include <lava/ecs/scene-view.hpp>
 #include "systems/moving-system.hpp"
 #include "systems/render-system.hpp"
+#include "systems/transform-system.hpp"
 int main(int argc, char *argv[])
 {
     fprintf(stdout, argv[0]);
@@ -22,10 +23,11 @@ int main(int argc, char *argv[])
         auto world = std::make_unique<lava::ecs::World>();
         auto app = lava::App();
         world
-            ->addSystem(pong::movingSystem)
-            ->addSystem(pong::renderSystem);
+            ->addSystem(pong::systems::movingSystem)
+            ->addSystem(pong::systems::renderSystem)
+            ->addSystem(pong::systems::transformSystem);
 
-        lava::ecs::SceneArchetype& scene = world->getActiveScene();
+        lava::ecs::Scene& scene = world->getActiveScene();
 
         auto id = scene.createEntity();
         auto transform1 = scene.addComponent<lava::ecs::Transform>(id);

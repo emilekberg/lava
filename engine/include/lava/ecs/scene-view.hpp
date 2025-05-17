@@ -23,41 +23,65 @@ namespace lava::ecs
         }
         struct Iterator
         {
-            Iterator(Scene* scene, EntityIndex index, ComponentMask mask, bool all) 
-                : pScene(scene), index(index), mask(mask), all(all)
+            Iterator(Scene* scene, size_t archetypeIndex, size_t entityIndex, ComponentMask mask, bool all) 
+                : pScene(scene), archetypeIndex(archetypeIndex), entityIndex(entityIndex), mask(mask), all(all)
             {
 
             }
-            EntityId operator*() const
+            auto operator*() const
             {
-                return pScene->entities[index].id;
+                //return {pScene->archetypes[archetypeIndex]->get<T>()...};
+                return pScene->archetypes[archetypeIndex]->entityIds[entityIndex];
             }
 
             bool operator==(const Iterator& other) const
             {
-                return index == other.index || index == pScene->entities.size();
+                return archetypeIndex == other.archetypeIndex && entityIndex == other.entityIndex;
             }
 
             bool operator!=(const Iterator& other) const 
             {
-                return index != other.index && index != pScene->entities.size();
+                return archetypeIndex != other.archetypeIndex || entityIndex != other.entityIndex;
             } 
 
-            bool isValidIndex()
+            bool isValidEntityIndex()
             {
-                return isEntityValid(pScene->entities[index].id) && (all || mask == (mask & pScene->entities[index].mask));
+                return isEntityValid(pScene->archetypes[archetypeIndex]->entityIds[entityIndex]) && (all || pScene->archetypes[archetypeIndex]->hasMask(mask));
+            }
+
+            bool isValidArchetypeIndex()
+            {
+                return pScene->archetypes[archetypeIndex]->hasMask(mask) && pScene->archetypes[archetypeIndex]->hasEntities();
             }
 
             Iterator& operator++()
             {
                 do
                 {
-                    index++;
-                } while (index < pScene->entities.size()  && !isValidIndex());
+                    do
+                    {
+                        entityIndex++;
+                        if(entityIndex < pScene->archetypes[archetypeIndex]->entityIds.size() && isValidEntityIndex())
+                        {
+                            return *this;
+                        }
+                    } while (entityIndex == pScene->archetypes[archetypeIndex]->entityIds.size());
+                    
+                    entityIndex = 0;
+                    do
+                    {
+                        archetypeIndex++;
+                    } while (archetypeIndex < pScene->archetypes.size() && !isValidArchetypeIndex());
+                    if(archetypeIndex < pScene->archetypes.size() && isValidEntityIndex())
+                    {
+                        return *this;
+                    }
+                } while (archetypeIndex < pScene->archetypes.size() && entityIndex < pScene->archetypes[archetypeIndex]->entityIds.size());
                 return *this;
             }
 
-            EntityIndex index;
+            size_t entityIndex;
+            size_t archetypeIndex;
             Scene* pScene;
             ComponentMask mask;
             bool all{false};
@@ -65,17 +89,41 @@ namespace lava::ecs
 
         const Iterator begin() const
         {
-            int firstIndex = 0;
-            while (firstIndex < pScene->entities.size() && (componentMask != (componentMask & pScene->entities[firstIndex].mask) || !isEntityValid(pScene->entities[firstIndex].id)))
+            size_t firstArchetypeIndex = 0;
+            size_t firstEntityIndex = 0;
+            bool wasArchetypeValid = true;
+            do
             {
-                firstIndex++;
-            }
-            return Iterator(pScene, firstIndex, componentMask, all);
+                firstEntityIndex = 0;
+                while (firstArchetypeIndex < pScene->archetypes.size() && (!pScene->archetypes[firstArchetypeIndex]->hasMask(componentMask) || !pScene->archetypes[firstArchetypeIndex]->hasEntities()))
+                {
+                    firstArchetypeIndex++;
+                }
+                wasArchetypeValid = true;
+                if (firstArchetypeIndex >= pScene->archetypes.size()) break;
+                while (firstEntityIndex < pScene->archetypes[firstArchetypeIndex]->entityIds.size() && !isEntityValid(pScene->archetypes[firstArchetypeIndex]->entityIds[firstEntityIndex]))
+                {
+                    firstEntityIndex++;
+                }
+                if(firstEntityIndex == pScene->archetypes[firstArchetypeIndex]->entityIds.size())
+                {
+                    firstArchetypeIndex++;
+                    wasArchetypeValid = false;
+                    if(firstArchetypeIndex == pScene->archetypes.size())
+                    {
+                        return end();
+                    }
+                }
+
+            } while(!wasArchetypeValid);
+
+            return Iterator(pScene, firstArchetypeIndex, firstEntityIndex, componentMask, all);
         }
 
         const Iterator end() const
         {
-            return Iterator(pScene, EntityIndex(pScene->entities.size()), componentMask, all);
+            size_t lastArchetypeIndex = pScene->archetypes.size();
+            return Iterator(pScene, lastArchetypeIndex, 0, componentMask, all);
         }
 
 

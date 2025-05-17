@@ -3,12 +3,12 @@
 #include <vector>
 #include <functional>
 #include <chrono>
-#include "./scene-archetype.hpp"
+#include "./scene.hpp"
 
 namespace lava::ecs
 {
     using chrono_ms = std::chrono::duration<float, std::milli>;
-    using EcsSystemCallback = std::function<void(SceneArchetype&, const float)>;
+    using EcsSystemCallback = std::function<void(Scene&, const float)>;
     struct World
     {
         World* addSystem(const EcsSystemCallback& system)
@@ -17,7 +17,7 @@ namespace lava::ecs
             return this;
         }
         
-        inline SceneArchetype& getActiveScene()
+        inline Scene& getActiveScene()
         {
             return _scene;
         }
@@ -34,7 +34,7 @@ namespace lava::ecs
         }
 
         std::vector<EcsSystemCallback> systems;
-        SceneArchetype _scene;
+        Scene _scene;
         std::chrono::high_resolution_clock timer;
         std::chrono::steady_clock::time_point lastFrame;
     };

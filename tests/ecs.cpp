@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
-#include <lava/ecs/scene-archetype.hpp>
+#include <lava/ecs/scene.hpp>
 
 TEST(ECS_Scene, CreateEntity)
 {
-    lava::ecs::SceneArchetype scene;
+    lava::ecs::Scene scene;
 
     auto id = scene.createEntity();
     EXPECT_EQ(lava::ecs::getEntityIndex(id), 0);
@@ -16,7 +16,7 @@ TEST(ECS_Scene, CreateEntity)
 
 TEST(ECS_Scene, CreateEntity_Regenerate)
 {
-    lava::ecs::SceneArchetype scene;
+    lava::ecs::Scene scene;
 
     auto id = scene.createEntity();
     EXPECT_EQ(lava::ecs::getEntityIndex(id), 0);
@@ -32,7 +32,7 @@ TEST(ECS_Scene, CreateEntity_Regenerate)
 TEST(ECS_Scene, AddComponent)
 {
     struct SomeComponent{ int value = 5; };
-    lava::ecs::SceneArchetype scene;
+    lava::ecs::Scene scene;
 
     auto id = scene.createEntity();
     auto component = scene.addComponent<SomeComponent>(id);
@@ -45,7 +45,7 @@ TEST(ECS_Scene, Add2Components)
 {
     struct SomeComponent{ int value = 3; };
     struct AnotherComponent{int value = 10; };
-    lava::ecs::SceneArchetype scene;
+    lava::ecs::Scene scene;
 
     auto id = scene.createEntity();
     auto someComponent = scene.addComponent<SomeComponent>(id);

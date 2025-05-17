@@ -1,15 +1,18 @@
 #pragma once
-#include <lava/ecs/scene-view-archetype.hpp>
+#include <lava/ecs/scene-view.hpp>
 #include "../components/input.hpp"
-using lava::ecs::SceneViewArchetype;
+#include "../components/player.hpp"
+
+using lava::ecs::SceneView;
 using lava::ecs::SceneArchetype;
-namespace pong
+using namespace pong::components;
+namespace pong::systems
 {
-    void inputSystem(SceneArchetype& scene)
+    void inputSystem(Scene& scene)
     {
-        for(lava::ecs::EntityId id : SceneViewArchetype<pong::Input>(scene))
+        for(lava::ecs::EntityId id : SceneView<Input>(scene))
         {
-            auto input = scene.getComponent<pong::Input>(id);
+            auto input = scene.getComponent<Input>(id);
         }
     }
 }
